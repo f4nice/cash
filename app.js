@@ -187,6 +187,12 @@
     return `¥ ${amount}`;
   }
 
+  function formatSignedMoney(value) {
+    const amount = Number(value) || 0;
+    const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
+    return `${prefix}${formatMoney(Math.abs(amount))}`;
+  }
+
   function parseAmount(value) {
     if (typeof value === "number") return value;
     if (value === null || value === undefined) return 0;
@@ -1381,6 +1387,164 @@
     }
   }
 
+  function ensureCapitalAccountDialog() {
+    if (document.getElementById("capitalAccountDialog")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="employee-dialog-backdrop" id="capitalAccountDialog" hidden>
+        <section class="employee-dialog capital-account-dialog" role="dialog" aria-modal="true" aria-labelledby="capitalAccountDialogTitle">
+          <div class="section-title-row">
+            <div><p class="eyebrow">账户资金</p><h3 id="capitalAccountDialogTitle">资金变化</h3></div>
+            <button class="ghost-button" type="button" id="closeCapitalAccountDialog">关闭</button>
+          </div>
+          <div class="employee-dialog-summary" id="capitalAccountDialogSummary"></div>
+          <div class="account-change-strip" id="capitalAccountChangeStrip"></div>
+          <div class="account-change-scroll">
+            <section>
+              <div class="account-change-section-title">
+                <span>余额快照</span>
+                <small>按上传资金表日期计算，每次变化为较上次余额</small>
+              </div>
+              <div class="table-wrap account-change-table-wrap">
+                <table>
+                  <thead><tr><th>日期</th><th>余额</th><th>较上次</th><th>保存时间</th><th>备注</th></tr></thead>
+                  <tbody id="capitalAccountSnapshotBody"></tbody>
+                </table>
+              </div>
+            </section>
+            <section>
+              <div class="account-change-section-title">
+                <span>流水记录</span>
+                <small>仅显示最近 80 条实际收支流水</small>
+              </div>
+              <div class="table-wrap account-change-table-wrap">
+                <table>
+                  <thead><tr><th>日期</th><th>方向</th><th>类别</th><th>对方户名</th><th>金额</th><th>来源</th></tr></thead>
+                  <tbody id="capitalAccountTransactionBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    `);
+    document.getElementById("closeCapitalAccountDialog")?.addEventListener("click", closeCapitalAccountDialog);
+    document.getElementById("capitalAccountDialog")?.addEventListener("click", (event) => {
+      if (event.target.id === "capitalAccountDialog") closeCapitalAccountDialog();
+    });
+  }
+
+  function closeCapitalAccountDialog() {
+    const dialog = document.getElementById("capitalAccountDialog");
+    if (dialog) dialog.hidden = true;
+  }
+
+  function renderCapitalAccountDialog(data) {
+    const summary = document.getElementById("capitalAccountDialogSummary");
+    const strip = document.getElementById("capitalAccountChangeStrip");
+    const snapshotBody = document.getElementById("capitalAccountSnapshotBody");
+    const transactionBody = document.getElementById("capitalAccountTransactionBody");
+    const snapshots = data.snapshots || [];
+    const transactions = data.transactions || [];
+    const currentBalance = Number(data.summary?.currentBalance || 0);
+    const latestChange = Number(data.summary?.latestChange || 0);
+
+    if (summary) {
+      summary.innerHTML = `
+        <article><span>当前余额</span><strong>${formatMoney(currentBalance)}</strong></article>
+        <article><span>最近变化</span><strong class="${latestChange >= 0 ? "positive" : "negative"}">${formatSignedMoney(latestChange)}</strong></article>
+        <article><span>累计流入</span><strong>${formatMoney(data.summary?.income || 0)}</strong></article>
+        <article><span>累计流出</span><strong>${formatMoney(data.summary?.expense || 0)}</strong></article>
+      `;
+    }
+
+    if (strip) {
+      const recentSnapshots = snapshots.slice(-10);
+      const maxBalance = Math.max(...recentSnapshots.map((row) => Math.abs(Number(row.balance || 0))), 1);
+      strip.innerHTML = recentSnapshots.length ? recentSnapshots.map((row) => {
+        const balance = Number(row.balance || 0);
+        const change = Number(row.change || 0);
+        const height = Math.max(12, Math.round((Math.abs(balance) / maxBalance) * 100));
+        return `
+          <div class="account-change-tile">
+            <div class="account-change-bar" style="--height:${height}%"></div>
+            <strong>${formatMoney(balance)}</strong>
+            <span>${escapeHtml(formatDate(row.date))}</span>
+            <small class="${change >= 0 ? "positive" : "negative"}">${formatSignedMoney(change)}</small>
+          </div>
+        `;
+      }).join("") : '<div class="account-change-empty">暂无余额变化</div>';
+    }
+
+    if (snapshotBody) {
+      snapshotBody.innerHTML = snapshots.length ? snapshots.slice().reverse().map((row) => {
+        const change = Number(row.change || 0);
+        return `
+          <tr>
+            <td>${escapeHtml(formatDate(row.date))}</td>
+            <td>${formatMoney(row.balance)}</td>
+            <td class="${change >= 0 ? "positive" : "negative"}">${row.change === null || row.change === undefined ? "-" : formatSignedMoney(change)}</td>
+            <td>${escapeHtml(formatDateTime(row.updatedAt || row.createdAt))}</td>
+            <td>${escapeHtml(row.remark || "-")}</td>
+          </tr>
+        `;
+      }).join("") : '<tr><td colspan="5">暂无余额快照</td></tr>';
+    }
+
+    if (transactionBody) {
+      transactionBody.innerHTML = transactions.length ? transactions.map((row) => {
+        const amount = Number(row.amount || 0);
+        const isIn = row.direction === "in";
+        return `
+          <tr>
+            <td>${escapeHtml(formatDate(row.date))}</td>
+            <td class="${isIn ? "positive" : "negative"}">${isIn ? "流入" : "流出"}</td>
+            <td>${escapeHtml(row.category || "-")}</td>
+            <td>${escapeHtml(row.counterparty || "-")}</td>
+            <td class="${isIn ? "positive" : "negative"}">${isIn ? formatMoney(amount) : `-${formatMoney(amount)}`}</td>
+            <td>${escapeHtml(row.sourceDocNo || row.description || "-")}</td>
+          </tr>
+        `;
+      }).join("") : '<tr><td colspan="6">暂无流水记录</td></tr>';
+    }
+  }
+
+  async function openCapitalAccountDialog(accountId = state.selectedAccount) {
+    if (accountId) updateBankAccount(accountId);
+    const company = companyData[state.selectedCompany];
+    const account = getSelectedAccount();
+    if (!company || !account) return;
+
+    ensureCapitalAccountDialog();
+    setText("capitalAccountDialogTitle", `${company.name} / ${account.bank} ${account.accountName} 资金变化`);
+    const dialog = document.getElementById("capitalAccountDialog");
+    const summary = document.getElementById("capitalAccountDialogSummary");
+    const strip = document.getElementById("capitalAccountChangeStrip");
+    const snapshotBody = document.getElementById("capitalAccountSnapshotBody");
+    const transactionBody = document.getElementById("capitalAccountTransactionBody");
+    if (summary) summary.innerHTML = '<article><span>正在读取</span><strong>请稍候</strong></article>';
+    if (strip) strip.innerHTML = "";
+    if (snapshotBody) snapshotBody.innerHTML = '<tr><td colspan="5">正在读取资金变化</td></tr>';
+    if (transactionBody) transactionBody.innerHTML = '<tr><td colspan="6">正在读取流水</td></tr>';
+    if (dialog) dialog.hidden = false;
+
+    try {
+      const params = new URLSearchParams({
+        company: company.code,
+        account: account.id,
+        bank: account.bank,
+        accountName: account.accountName
+      });
+      const response = await fetch(`/api/capital/account-changes?${params.toString()}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "资金变化读取失败");
+      renderCapitalAccountDialog(data);
+    } catch (error) {
+      if (summary) summary.innerHTML = `<article><span>读取失败</span><strong>${escapeHtml(error.message || "请稍后重试")}</strong></article>`;
+      if (snapshotBody) snapshotBody.innerHTML = '<tr><td colspan="5">暂无可显示数据</td></tr>';
+      if (transactionBody) transactionBody.innerHTML = '<tr><td colspan="6">暂无可显示数据</td></tr>';
+    }
+  }
+
   function renderBankAccounts() {
     const company = companyData[state.selectedCompany];
     const list = document.getElementById("bankAccountList");
@@ -1400,7 +1564,7 @@
     `).join("");
 
     list.querySelectorAll("[data-bank-account]").forEach((button) => {
-      button.addEventListener("click", () => updateBankAccount(button.dataset.bankAccount));
+      button.addEventListener("click", () => openCapitalAccountDialog(button.dataset.bankAccount));
     });
 
     updateBankAccount(state.selectedAccount);

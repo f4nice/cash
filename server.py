@@ -1164,6 +1164,122 @@ def delete_capital_account_records(payload):
     }
 
 
+def load_capital_account_changes(company_code, account_key, bank_name="", account_name=""):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = find_company(cur, company_code, "")
+            account = find_bank_account(
+                cur,
+                company["id"],
+                {
+                    "key": account_key,
+                    "bank": bank_name,
+                    "accountName": account_name,
+                },
+            )
+            cur.execute(
+                """
+                SELECT id, bank_name, account_name, account_no, opening_balance
+                FROM bank_accounts
+                WHERE id = %s AND company_id = %s AND status = 'active'
+                LIMIT 1
+                """,
+                (account["id"], company["id"]),
+            )
+            account_row = cur.fetchone()
+            if not account_row:
+                raise ApiError(404, "银行账户不存在")
+
+            cur.execute(
+                """
+                SELECT snapshot_date, balance, remark, created_at, updated_at
+                FROM capital_snapshots
+                WHERE company_id = %s AND account_id = %s
+                ORDER BY snapshot_date ASC, id ASC
+                """,
+                (company["id"], account["id"]),
+            )
+            snapshot_rows = cur.fetchall()
+            cur.execute(
+                """
+                SELECT txn_date, direction, category, counterparty, amount, description, source_doc_no, created_at
+                FROM cash_transactions
+                WHERE company_id = %s AND account_id = %s
+                ORDER BY txn_date DESC, id DESC
+                LIMIT 80
+                """,
+                (company["id"], account["id"]),
+            )
+            transaction_rows = cur.fetchall()
+            cur.execute(
+                """
+                SELECT
+                  COALESCE(SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0) AS income,
+                  COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0) AS expense
+                FROM cash_transactions
+                WHERE company_id = %s AND account_id = %s
+                """,
+                (company["id"], account["id"]),
+            )
+            totals = cur.fetchone() or {}
+
+    snapshots = []
+    previous_balance = None
+    for row in snapshot_rows:
+        balance = row["balance"] or Decimal("0")
+        change = None if previous_balance is None else balance - previous_balance
+        snapshots.append(
+            {
+                "date": row["snapshot_date"],
+                "balance": balance,
+                "change": change,
+                "remark": row["remark"],
+                "createdAt": row["created_at"],
+                "updatedAt": row["updated_at"],
+            }
+        )
+        previous_balance = balance
+
+    current_balance = snapshots[-1]["balance"] if snapshots else account_row["opening_balance"] or Decimal("0")
+    previous_snapshot_balance = snapshots[-2]["balance"] if len(snapshots) > 1 else None
+    latest_change = (current_balance - previous_snapshot_balance) if previous_snapshot_balance is not None else Decimal("0")
+    transactions = [
+        {
+            "date": row["txn_date"],
+            "direction": row["direction"],
+            "category": row["category"],
+            "counterparty": row["counterparty"],
+            "amount": row["amount"] or Decimal("0"),
+            "description": row["description"],
+            "sourceDocNo": row["source_doc_no"],
+            "createdAt": row["created_at"],
+        }
+        for row in transaction_rows
+    ]
+    return {
+        "company": {
+            "code": company["company_code"],
+            "name": company["company_name"],
+        },
+        "account": {
+            "id": account_row["account_no"] or f"account-{account_row['id']}",
+            "bank": account_row["bank_name"],
+            "accountName": account_row["account_name"],
+            "openingBalance": account_row["opening_balance"] or Decimal("0"),
+        },
+        "summary": {
+            "currentBalance": current_balance,
+            "latestChange": latest_change,
+            "snapshotCount": len(snapshots),
+            "transactionCount": len(transactions),
+            "income": totals.get("income") or Decimal("0"),
+            "expense": totals.get("expense") or Decimal("0"),
+        },
+        "snapshots": snapshots,
+        "transactions": transactions,
+    }
+
+
 def import_payroll(payload):
     rows = payload.get("rows") or []
     if not rows:
@@ -1416,6 +1532,13 @@ class Handler(SimpleHTTPRequestHandler):
             return load_payroll_salary_details((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "GET" and path == "/api/payroll/employees":
             return load_payroll_employees((query.get("period") or [""])[0], (query.get("company") or [""])[0])
+        if method == "GET" and path == "/api/capital/account-changes":
+            return load_capital_account_changes(
+                (query.get("company") or [""])[0],
+                (query.get("account") or [""])[0],
+                (query.get("bank") or [""])[0],
+                (query.get("accountName") or [""])[0],
+            )
         if method == "POST" and path == "/api/companies":
             return save_company(self.read_json())
         if method == "POST" and path == "/api/companies/delete":

@@ -1195,6 +1195,87 @@ td {
   min-width: 1120px;
 }
 
+.capital-account-dialog {
+  width: min(1160px, 100%);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.account-change-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  min-height: 126px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.account-change-tile {
+  display: grid;
+  grid-template-rows: minmax(56px, 1fr) auto auto auto;
+  gap: 5px;
+  align-items: end;
+  min-width: 0;
+}
+
+.account-change-bar {
+  width: 100%;
+  height: var(--height);
+  min-height: 12px;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, #41b7a4, #0f7f6f);
+}
+
+.account-change-tile strong,
+.account-change-tile span,
+.account-change-tile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-change-tile span,
+.account-change-tile small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-change-empty {
+  grid-column: 1 / -1;
+  align-self: center;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+
+.account-change-scroll {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.account-change-section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.account-change-section-title span {
+  font-weight: 800;
+}
+
+.account-change-section-title small {
+  color: var(--muted);
+}
+
+.account-change-table-wrap table {
+  min-width: 920px;
+}
+
 .upload-button-row {
   display: flex;
   gap: 8px;
