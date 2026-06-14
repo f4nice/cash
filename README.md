@@ -8,7 +8,7 @@
 - `examples.sql`：常用录入和查询示例。
 - `index.html`：网站首页和财务驾驶舱界面。
 - `styles.css`：首页样式。
-- `app.js`：工资单公司选择、Excel/CSV 读取、薪资社保汇总预览。
+- `app.js`：资金表和工资单的公司选择、Excel/CSV 读取、现金流和薪资社保汇总预览。
 
 ## 导入方式
 

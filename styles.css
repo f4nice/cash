@@ -520,11 +520,17 @@ td {
   min-height: 0;
 }
 
+.capital-workspace {
+  min-height: 0;
+}
+
+.capital-actions,
 .payroll-actions {
   display: flex;
   gap: 10px;
 }
 
+.capital-overview,
 .payroll-overview {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -532,6 +538,7 @@ td {
   margin-bottom: 16px;
 }
 
+.capital-overview article,
 .payroll-overview article {
   display: grid;
   gap: 8px;
@@ -542,6 +549,7 @@ td {
   background: #f7faf9;
 }
 
+.capital-overview span,
 .payroll-overview span,
 .section-title-row span,
 .upload-zone small,
@@ -549,10 +557,12 @@ td {
   color: var(--muted);
 }
 
+.capital-overview strong,
 .payroll-overview strong {
   font-size: 23px;
 }
 
+.capital-layout,
 .payroll-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.75fr);
@@ -560,6 +570,11 @@ td {
   margin-bottom: 16px;
 }
 
+.capital-companies,
+.capital-upload,
+.capital-preview,
+.capital-chart-card,
+.capital-cashflow-card,
 .payroll-companies,
 .payroll-upload,
 .payroll-preview {
@@ -567,6 +582,13 @@ td {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(247, 250, 249, 0.76);
+}
+
+.capital-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .section-title-row {
@@ -595,12 +617,18 @@ td {
   font-weight: 700;
 }
 
+.section-title-row.compact {
+  margin-bottom: 10px;
+}
+
+.capital-company-grid,
 .payroll-company-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
+.capital-company-card,
 .payroll-company-card {
   display: grid;
   gap: 7px;
@@ -613,23 +641,67 @@ td {
   text-align: left;
 }
 
+.capital-company-card.selected,
 .payroll-company-card.selected {
   border-color: rgba(15, 143, 122, 0.58);
   background: #eef8f5;
   box-shadow: inset 0 0 0 1px rgba(15, 143, 122, 0.16);
 }
 
+.capital-company-card span,
 .payroll-company-card span {
   color: var(--muted);
   font-size: 13px;
 }
 
+.capital-company-card strong,
 .payroll-company-card strong {
   font-size: 22px;
 }
 
+.capital-company-card small,
 .payroll-company-card small {
   color: var(--muted);
+}
+
+.bank-account-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.bank-account-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bank-account-button {
+  display: grid;
+  gap: 6px;
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #f7faf9;
+  text-align: left;
+}
+
+.bank-account-button.selected {
+  border-color: rgba(15, 143, 122, 0.58);
+  background: #eef8f5;
+}
+
+.bank-account-button span,
+.bank-account-button small {
+  color: var(--muted);
+}
+
+.bank-account-button strong {
+  font-size: 19px;
 }
 
 .upload-zone {
@@ -687,6 +759,14 @@ td {
   font-size: 17px;
 }
 
+.capital-import-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cashflow-table-wrap table {
+  min-width: 1080px;
+}
+
 .payroll-table-wrap table {
   min-width: 980px;
 }
@@ -726,6 +806,11 @@ td {
   .payroll-layout {
     grid-template-columns: 1fr;
   }
+
+  .capital-layout,
+  .capital-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -740,12 +825,19 @@ td {
   }
 
   .topbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
   .primary-button,
+  .ghost-button,
   .icon-button {
     flex: 1;
+  }
+
+  .topbar-actions .primary-button {
+    grid-column: 1 / -1;
   }
 
   .nav-list {
@@ -770,18 +862,24 @@ td {
     grid-row: auto;
   }
 
+  .capital-actions,
   .payroll-actions,
   .section-title-row {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .capital-overview,
   .payroll-overview,
+  .capital-company-grid,
   .payroll-company-grid,
+  .bank-account-list,
+  .capital-import-summary,
   .import-summary {
     grid-template-columns: 1fr;
   }
 
+  .capital-layout,
   .payroll-layout {
     grid-template-columns: 1fr;
   }

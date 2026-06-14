@@ -2,50 +2,67 @@
   const companyData = {
     tech: {
       name: "示例科技",
-      employees: 18,
-      netSalary: 58900,
-      tax: 3450,
-      employeeSocial: 7100,
-      employerSocial: 15600,
-      employeeFund: 4200,
-      employerFund: 4200,
-      totalCost: 78450
+      funds: 1284600,
+      bankAccounts: [
+        { id: "tech-cmb-basic", bank: "招商银行", accountName: "基本户", balance: 862400 },
+        { id: "tech-ccb-general", bank: "建设银行", accountName: "一般户", balance: 332200 },
+        { id: "tech-alipay", bank: "支付宝", accountName: "企业账户", balance: 90000 }
+      ],
+      payroll: {
+        employees: 18,
+        netSalary: 58900,
+        tax: 3450,
+        employeeSocial: 7100,
+        employerSocial: 15600,
+        employeeFund: 4200,
+        employerFund: 4200,
+        totalCost: 78450
+      }
     },
     trade: {
       name: "示例贸易",
-      employees: 14,
-      netSalary: 38100,
-      tax: 2700,
-      employeeSocial: 5200,
-      employerSocial: 11900,
-      employeeFund: 2800,
-      employerFund: 2800,
-      totalCost: 54800
+      funds: 684200,
+      bankAccounts: [
+        { id: "trade-icbc-basic", bank: "工商银行", accountName: "基本户", balance: 596400 },
+        { id: "trade-wechat", bank: "微信支付", accountName: "商户号", balance: 87800 }
+      ],
+      payroll: {
+        employees: 14,
+        netSalary: 38100,
+        tax: 2700,
+        employeeSocial: 5200,
+        employerSocial: 11900,
+        employeeFund: 2800,
+        employerFund: 2800,
+        totalCost: 54800
+      }
     },
     holding: {
       name: "控股主体",
-      employees: 10,
-      netSalary: 24900,
-      tax: 2300,
-      employeeSocial: 3100,
-      employerSocial: 7200,
-      employeeFund: 1800,
-      employerFund: 1800,
-      totalCost: 43600
+      funds: 2108900,
+      bankAccounts: [
+        { id: "holding-boc-general", bank: "中国银行", accountName: "一般户", balance: 1718900 },
+        { id: "holding-securities", bank: "证券账户", accountName: "资金账户", balance: 390000 }
+      ],
+      payroll: {
+        employees: 10,
+        netSalary: 24900,
+        tax: 2300,
+        employeeSocial: 3100,
+        employerSocial: 7200,
+        employeeFund: 1800,
+        employerFund: 1800,
+        totalCost: 43600
+      }
     }
   };
 
   const state = {
-    selectedCompany: "tech"
+    selectedCompany: "tech",
+    selectedAccount: "tech-cmb-basic"
   };
 
-  const money = new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-    maximumFractionDigits: 0
-  });
-
-  const fieldAliases = {
+  const payrollFieldAliases = {
     name: ["姓名", "员工", "员工姓名", "employee_name", "name"],
     gross: ["应发工资", "应发", "税前工资", "gross_salary", "gross"],
     net: ["实发工资", "实发", "到手工资", "net_salary", "net"],
@@ -56,8 +73,22 @@
     employerFund: ["公司公积金", "单位公积金", "公司承担公积金", "employer_housing_fund"]
   };
 
+  const capitalFieldAliases = {
+    date: ["日期", "交易日期", "入账日期", "记账日期", "date", "txn_date"],
+    bank: ["银行", "开户行", "所属银行", "bank", "bank_name"],
+    account: ["账户", "账号", "银行账户", "账户名称", "account", "account_name"],
+    summary: ["摘要", "用途", "类别", "分类", "备注", "说明", "description", "remark", "category"],
+    counterparty: ["对方户名", "对方账户名", "交易对手", "counterparty"],
+    income: ["流入", "收入", "入账金额", "贷方金额", "收款金额", "income", "in"],
+    expense: ["流出", "支出", "出账金额", "借方金额", "付款金额", "expense", "out"],
+    amount: ["金额", "交易金额", "发生额", "amount"],
+    direction: ["方向", "收支方向", "收支", "direction"],
+    balance: ["余额", "账户余额", "balance"]
+  };
+
   function formatMoney(value) {
-    return money.format(Number(value) || 0).replace("CN¥", "¥ ");
+    const amount = Math.round(Number(value) || 0).toLocaleString("zh-CN");
+    return `¥ ${amount}`;
   }
 
   function parseAmount(value) {
@@ -78,7 +109,7 @@
       const target = normalizeHeader(alias);
       const exact = normalizedHeaders.indexOf(target);
       if (exact >= 0) return exact;
-      const loose = normalizedHeaders.findIndex((header) => header.includes(target) || target.includes(header));
+      const loose = normalizedHeaders.findIndex((header) => header && (header.includes(target) || target.includes(header)));
       if (loose >= 0) return loose;
     }
     return -1;
@@ -91,15 +122,36 @@
       .map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
   }
 
-  function mapPayrollRows(rows) {
-    if (!rows.length) return [];
-    const headerRowIndex = rows.findIndex((row) => row.some((cell) => /姓名|员工|name/i.test(String(cell))));
-    const headers = rows[headerRowIndex >= 0 ? headerRowIndex : 0] || [];
-    const startIndex = (headerRowIndex >= 0 ? headerRowIndex : 0) + 1;
-    const columns = Object.fromEntries(
-      Object.entries(fieldAliases).map(([key, aliases]) => [key, findColumn(headers, aliases)])
-    );
+  async function readSheetRows(file, statusId) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (ext === "csv") return rowsFromCsv(await file.text());
 
+    if (!window.XLSX) {
+      setText(statusId, "Excel解析库未加载");
+      return [];
+    }
+
+    const buffer = await file.arrayBuffer();
+    const workbook = window.XLSX.read(buffer, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    return window.XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: "" });
+  }
+
+  function mapColumns(rows, aliasesMap, headerPattern) {
+    if (!rows.length) return { columns: {}, startIndex: 0 };
+    const headerRowIndex = rows.findIndex((row) => row.some((cell) => headerPattern.test(String(cell))));
+    const headers = rows[headerRowIndex >= 0 ? headerRowIndex : 0] || [];
+    const columns = Object.fromEntries(
+      Object.entries(aliasesMap).map(([key, aliases]) => [key, findColumn(headers, aliases)])
+    );
+    return {
+      columns,
+      startIndex: (headerRowIndex >= 0 ? headerRowIndex : 0) + 1
+    };
+  }
+
+  function mapPayrollRows(rows) {
+    const { columns, startIndex } = mapColumns(rows, payrollFieldAliases, /姓名|员工|name/i);
     return rows.slice(startIndex).map((row) => {
       const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
       const getMoney = (key) => (columns[key] >= 0 ? parseAmount(row[columns[key]]) : 0);
@@ -123,7 +175,42 @@
     }).filter((row) => row.name || row.gross || row.net);
   }
 
-  function summarize(rows) {
+  function mapCapitalRows(rows) {
+    const company = companyData[state.selectedCompany];
+    const account = getSelectedAccount();
+    const { columns, startIndex } = mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
+
+    return rows.slice(startIndex).map((row) => {
+      const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
+      const getMoney = (key) => (columns[key] >= 0 ? parseAmount(row[columns[key]]) : 0);
+      let income = getMoney("income");
+      let expense = getMoney("expense");
+      const amount = getMoney("amount");
+      const direction = getText("direction");
+
+      if (!income && !expense && amount) {
+        if (amount < 0 || /出|支|付|借|out|debit/i.test(direction)) {
+          expense = Math.abs(amount);
+        } else {
+          income = Math.abs(amount);
+        }
+      }
+
+      return {
+        date: getText("date") || "未填日期",
+        company: company.name,
+        bank: getText("bank") || account.bank,
+        account: getText("account") || account.accountName,
+        summary: getText("summary") || "银行流水",
+        counterparty: getText("counterparty") || "-",
+        income,
+        expense,
+        balance: getMoney("balance")
+      };
+    }).filter((row) => row.date !== "未填日期" || row.income || row.expense || row.balance);
+  }
+
+  function summarizePayroll(rows) {
     return rows.reduce((total, row) => {
       total.rows += 1;
       total.net += row.net;
@@ -146,15 +233,40 @@
     });
   }
 
+  function summarizeCapital(rows) {
+    return rows.reduce((total, row) => {
+      total.rows += 1;
+      total.income += row.income;
+      total.expense += row.expense;
+      total.net += row.income - row.expense;
+      return total;
+    }, { rows: 0, income: 0, expense: 0, net: 0 });
+  }
+
+  function getSelectedAccount() {
+    const company = companyData[state.selectedCompany];
+    return company.bankAccounts.find((account) => account.id === state.selectedAccount) || company.bankAccounts[0];
+  }
+
   function setText(id, value) {
     const node = document.getElementById(id);
     if (node) node.textContent = value;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
   function updateCompany(companyKey) {
     const company = companyData[companyKey];
     if (!company) return;
     state.selectedCompany = companyKey;
+    state.selectedAccount = company.bankAccounts[0].id;
 
     document.querySelectorAll("[data-company]").forEach((node) => {
       node.classList.toggle("selected", node.dataset.company === companyKey);
@@ -162,9 +274,47 @@
 
     setText("selectedCompanyBadge", company.name);
     setText("uploadCompanyBadge", `当前公司：${company.name}`);
+    setText("selectedCapitalCompanyBadge", company.name);
+    setText("capitalUploadCompanyBadge", `当前公司：${company.name}`);
+    renderBankAccounts();
   }
 
-  function renderPreview(rows) {
+  function updateBankAccount(accountId) {
+    const company = companyData[state.selectedCompany];
+    const account = company.bankAccounts.find((item) => item.id === accountId);
+    if (!account) return;
+    state.selectedAccount = accountId;
+
+    document.querySelectorAll("[data-bank-account]").forEach((node) => {
+      node.classList.toggle("selected", node.dataset.bankAccount === accountId);
+    });
+
+    const label = `${account.bank} ${account.accountName}`;
+    setText("selectedBankBadge", label);
+    setText("capitalUploadBankBadge", `当前银行：${label}`);
+  }
+
+  function renderBankAccounts() {
+    const company = companyData[state.selectedCompany];
+    const list = document.getElementById("bankAccountList");
+    if (!list) return;
+
+    list.innerHTML = company.bankAccounts.map((account) => `
+      <button class="bank-account-button${account.id === state.selectedAccount ? " selected" : ""}" type="button" data-bank-account="${account.id}">
+        <span>${escapeHtml(account.bank)}</span>
+        <strong>${formatMoney(account.balance)}</strong>
+        <small>${escapeHtml(account.accountName)}</small>
+      </button>
+    `).join("");
+
+    list.querySelectorAll("[data-bank-account]").forEach((button) => {
+      button.addEventListener("click", () => updateBankAccount(button.dataset.bankAccount));
+    });
+
+    updateBankAccount(state.selectedAccount);
+  }
+
+  function renderPayrollPreview(rows) {
     const tbody = document.getElementById("payrollPreviewBody");
     if (!tbody) return;
     if (!rows.length) {
@@ -186,36 +336,75 @@
     `).join("");
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  function renderCapitalPreview(rows) {
+    const tbody = document.getElementById("capitalPreviewBody");
+    if (!tbody) return;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">暂无导入数据</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.slice(0, 12).map((row) => `
+      <tr>
+        <td>${escapeHtml(row.date)}</td>
+        <td>${escapeHtml(row.bank)}</td>
+        <td>${escapeHtml(row.account)}</td>
+        <td>${escapeHtml(row.summary)}</td>
+        <td>${escapeHtml(row.counterparty)}</td>
+        <td>${formatMoney(row.income)}</td>
+        <td>${formatMoney(row.expense)}</td>
+        <td>${row.balance ? formatMoney(row.balance) : "-"}</td>
+      </tr>
+    `).join("");
+  }
+
+  function renderCashFlowSummary(rows) {
+    const tbody = document.getElementById("cashFlowBody");
+    if (!tbody || !rows.length) return;
+
+    const grouped = new Map();
+    rows.forEach((row) => {
+      const key = `${row.date}|${row.bank}|${row.account}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          date: row.date,
+          company: row.company,
+          bankAccount: `${row.bank} ${row.account}`,
+          income: 0,
+          expense: 0,
+          balance: 0
+        });
+      }
+      const item = grouped.get(key);
+      item.income += row.income;
+      item.expense += row.expense;
+      if (row.balance) item.balance = row.balance;
+    });
+
+    tbody.innerHTML = Array.from(grouped.values()).slice(0, 12).map((row) => {
+      const net = row.income - row.expense;
+      return `
+        <tr>
+          <td>${escapeHtml(row.date)}</td>
+          <td>${escapeHtml(row.company)}</td>
+          <td>${escapeHtml(row.bankAccount)}</td>
+          <td>导入汇总</td>
+          <td>${formatMoney(row.income)}</td>
+          <td>${formatMoney(row.expense)}</td>
+          <td class="${net >= 0 ? "positive" : ""}">${formatMoney(net)}</td>
+          <td>${row.balance ? formatMoney(row.balance) : "-"}</td>
+        </tr>
+      `;
+    }).join("");
   }
 
   async function readPayrollFile(file) {
-    const ext = file.name.split(".").pop().toLowerCase();
     setText("uploadFileName", file.name);
     setText("importStatus", "读取中");
 
-    let rows = [];
-    if (ext === "csv") {
-      rows = rowsFromCsv(await file.text());
-    } else {
-      if (!window.XLSX) {
-        setText("importStatus", "Excel解析库未加载");
-        return;
-      }
-      const buffer = await file.arrayBuffer();
-      const workbook = window.XLSX.read(buffer, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: "" });
-    }
-
+    const rows = await readSheetRows(file, "importStatus");
     const payrollRows = mapPayrollRows(rows);
-    const total = summarize(payrollRows);
+    const total = summarizePayroll(payrollRows);
     const selectedCompany = companyData[state.selectedCompany];
 
     setText("importRows", `${total.rows} 人`);
@@ -224,10 +413,28 @@
       total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
     ));
     setText("importStatus", `${selectedCompany.name} · 已读取`);
-    renderPreview(payrollRows);
+    renderPayrollPreview(payrollRows);
   }
 
-  function downloadTemplate() {
+  async function readCapitalFile(file) {
+    setText("capitalUploadFileName", file.name);
+    setText("capitalImportStatus", "读取中");
+
+    const rows = await readSheetRows(file, "capitalImportStatus");
+    const capitalRows = mapCapitalRows(rows);
+    const total = summarizeCapital(capitalRows);
+    const selectedCompany = companyData[state.selectedCompany];
+
+    setText("capitalImportRows", `${total.rows} 笔`);
+    setText("capitalImportIn", formatMoney(total.income));
+    setText("capitalImportOut", formatMoney(total.expense));
+    setText("capitalImportNet", formatMoney(total.net));
+    setText("capitalImportStatus", `${selectedCompany.name} · 已汇总`);
+    renderCapitalPreview(capitalRows);
+    renderCashFlowSummary(capitalRows);
+  }
+
+  function downloadPayrollTemplate() {
     const headers = [
       "员工编号", "姓名", "应发工资", "奖金", "补贴", "扣款",
       "个人社保", "个人公积金", "个税", "实发工资", "公司社保", "公司公积金"
@@ -236,12 +443,26 @@
       ["E001", "张三", "12000", "1000", "500", "0", "1200", "600", "450", "11250", "2600", "600"],
       ["E002", "李四", "15000", "0", "800", "0", "1500", "750", "700", "12850", "3200", "750"]
     ];
-    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    downloadCsv(`${companyData[state.selectedCompany].name}_工资单模板.csv`, [headers, ...rows]);
+  }
+
+  function downloadCapitalTemplate() {
+    const account = getSelectedAccount();
+    const headers = ["日期", "银行", "账户", "摘要", "对方户名", "流入", "流出", "余额"];
+    const rows = [
+      ["2026-06-01", account.bank, account.accountName, "销售回款", "客户甲", "30000", "", "892400"],
+      ["2026-06-02", account.bank, account.accountName, "采购付款", "供应商乙", "", "12000", "880400"]
+    ];
+    downloadCsv(`${companyData[state.selectedCompany].name}_${account.bank}_资金表模板.csv`, [headers, ...rows]);
+  }
+
+  function downloadCsv(fileName, rows) {
+    const csv = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${companyData[state.selectedCompany].name}_工资单模板.csv`;
+    link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -262,12 +483,22 @@
       node.addEventListener("click", () => document.getElementById("payrollFile")?.click());
     });
 
+    document.querySelectorAll("[data-open-capital-file]").forEach((node) => {
+      node.addEventListener("click", () => document.getElementById("capitalFile")?.click());
+    });
+
     document.getElementById("payrollFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
       if (file) readPayrollFile(file);
     });
 
-    document.getElementById("downloadTemplate")?.addEventListener("click", downloadTemplate);
+    document.getElementById("capitalFile")?.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      if (file) readCapitalFile(file);
+    });
+
+    document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);
+    document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
 
     document.querySelectorAll(".nav-item").forEach((node) => {
       node.addEventListener("click", () => {
