@@ -230,6 +230,17 @@ h2 {
   font-weight: 700;
 }
 
+.save-import-button {
+  min-width: 96px;
+}
+
+.save-import-button:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  background: #eef2f0;
+  cursor: not-allowed;
+}
+
 .file-action {
   display: inline-flex;
   align-items: center;

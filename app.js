@@ -88,6 +88,8 @@
     property: null
   };
 
+  let pendingPayrollImport = null;
+
   const uploadUi = {
     capital: {
       fileNameId: "capitalUploadFileName",
@@ -97,7 +99,7 @@
     },
     payroll: {
       fileNameId: "uploadFileName",
-      statusId: "importStatus",
+      statusId: null,
       sheetControlId: "payrollSheetControl",
       sheetSelectId: "payrollSheetSelect"
     },
@@ -262,6 +264,10 @@
     const ui = uploadUi[kind];
     selectedUploadFiles[kind] = file;
     setText(ui.fileNameId, file.name);
+    if (kind === "payroll") {
+      pendingPayrollImport = null;
+      setPayrollSaveButton(false);
+    }
 
     if (fileExt(file) === "csv") {
       hideSheetControl(kind);
@@ -280,6 +286,10 @@
     const file = selectedUploadFiles[kind];
     const ui = uploadUi[kind];
     if (!file) {
+      if (kind === "payroll") {
+        pendingPayrollImport = null;
+        setPayrollSaveButton(false, "保存");
+      }
       setText(ui.statusId, "请先选择Excel文件");
       return;
     }
@@ -431,8 +441,16 @@
   }
 
   function setText(id, value) {
+    if (!id) return;
     const node = document.getElementById(id);
     if (node) node.textContent = value;
+  }
+
+  function setPayrollSaveButton(enabled, label = "保存") {
+    const button = document.getElementById("savePayrollImport");
+    if (!button) return;
+    button.disabled = !enabled;
+    button.textContent = label;
   }
 
   function escapeHtml(value) {
@@ -673,33 +691,39 @@
 
   async function readPayrollFile(file, sheetName = "") {
     setText("uploadFileName", file.name);
-    setText("importStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
+    pendingPayrollImport = null;
+    setPayrollSaveButton(false, "读取中");
 
-    const rows = await readSheetRows(file, "importStatus", sheetName);
+    const rows = await readSheetRows(file, null, sheetName);
     const payrollRows = mapPayrollRows(rows);
     const total = summarizePayroll(payrollRows);
-    const selectedCompany = companyData[state.selectedCompany];
 
     setText("importRows", `${total.rows} 人`);
     setText("importCost", formatMoney(total.totalCost));
     setText("importSocialFund", formatMoney(
       total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
     ));
-    setText("importStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}`);
     renderPayrollPreview(payrollRows);
+    pendingPayrollImport = {
+      company: selectedCompanyPayload(),
+      period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
+      fileName: file.name,
+      sheetName,
+      rows: payrollRows
+    };
+    setPayrollSaveButton(payrollRows.length > 0, payrollRows.length ? "保存" : "无数据");
+  }
 
+  async function savePayrollImport() {
+    if (!pendingPayrollImport || !pendingPayrollImport.rows.length) return;
+    setPayrollSaveButton(false, "保存中");
     try {
-      const result = await postJson("/api/import/payroll", {
-        company: selectedCompanyPayload(),
-        period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
-        fileName: file.name,
-        sheetName,
-        rows: payrollRows
-      });
-      setText("importStatus", `${selectedCompany.name} · 已写入MySQL ${result.rows} 人`);
+      const result = await postJson("/api/import/payroll", pendingPayrollImport);
+      pendingPayrollImport = null;
+      setPayrollSaveButton(false, `已保存 ${result.rows}人`);
       await loadOverview();
     } catch (error) {
-      setText("importStatus", `${selectedCompany.name} · 已本地预览，未连接MySQL`);
+      setPayrollSaveButton(true, "重试保存");
     }
   }
 
@@ -908,6 +932,8 @@
     document.querySelectorAll("[data-import-selected-sheet]").forEach((node) => {
       node.addEventListener("click", () => importSelectedSheet(node.dataset.importSelectedSheet));
     });
+
+    document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);
 
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);
     document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
