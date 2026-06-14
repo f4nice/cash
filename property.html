@@ -50,36 +50,32 @@
                 <button class="property-company-card" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,400</strong><small>控股办公室 · 停车/水电/维修</small></button>
               </div>
             </section>
-            <section class="property-upload" id="property-upload" aria-labelledby="property-upload-title">
+            <section class="property-manual" id="property-manual" aria-labelledby="property-manual-title">
               <div class="section-title-row">
-                <div><p class="eyebrow">Excel导入</p><h3 id="property-upload-title">物业费用上传</h3></div>
+                <div><p class="eyebrow">消费项目</p><h3 id="property-manual-title">新增消费项目</h3></div>
                 <div class="upload-card-actions">
                   <span id="propertyUploadCompanyBadge">当前公司：示例科技</span>
-                  <div class="upload-button-row">
-                    <button class="ghost-button" type="button" id="downloadPropertyTemplate">下载模板</button>
-                    <label class="primary-button file-action" for="propertyFile" role="button" tabindex="0">上传Excel</label>
-                  </div>
                 </div>
               </div>
               <label class="period-control">
                 <span>所属月份</span>
                 <input id="propertyPeriod" type="month" value="2026-06" data-default-current>
               </label>
-              <label class="upload-zone" for="propertyFile">
-                <input id="propertyFile" type="file" accept=".xls,.xlsx,.csv">
-                <span class="upload-icon" aria-hidden="true">FEE</span>
-                <strong>选择物业费用Excel</strong>
-                <small id="propertyUploadFileName">未选择文件</small>
-              </label>
-              <div class="sheet-control" id="propertySheetControl" hidden>
-                <label for="propertySheetSelect"><span>选择Sheet</span><select id="propertySheetSelect"></select></label>
-                <button class="ghost-button" type="button" data-import-selected-sheet="property">读取此Sheet</button>
+              <div class="property-item-actions" aria-label="消费项目">
+                <button class="property-item-button selected" type="button" data-property-type="房租">房租项目</button>
+                <button class="property-item-button" type="button" data-property-type="水电煤">水电煤</button>
+                <button class="property-item-button" type="button" data-property-type="停车">停车</button>
+                <button class="property-item-button" type="button" data-property-type="物业费">物业费</button>
               </div>
-              <div class="import-summary" aria-live="polite">
-                <div><span>读取项目</span><strong id="propertyImportRows">0 项</strong></div>
-                <div><span>费用合计</span><strong id="propertyImportCost">¥ 0</strong></div>
-                <div><span>状态</span><strong id="propertyImportStatus">等待上传</strong></div>
-              </div>
+              <form class="property-expense-form" id="propertyExpenseForm">
+                <input type="hidden" id="propertyExpenseType" value="房租">
+                <label><span>物业所属</span><input id="propertyExpenseName" type="text" placeholder="例如：总部办公室"></label>
+                <label><span>金额</span><input id="propertyExpenseAmount" type="number" min="0" step="0.01" placeholder="输入金额" required></label>
+                <label><span>付款日期</span><input id="propertyExpenseDate" type="date"></label>
+                <label><span>收款方</span><input id="propertyExpenseVendor" type="text" placeholder="业主、物业公司或停车场"></label>
+                <button class="primary-button" type="submit">保存消费项目</button>
+              </form>
+              <div class="property-manual-status" id="propertyImportStatus">选择项目后录入金额并保存</div>
             </section>
           </div>
           <div class="property-layout">

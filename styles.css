@@ -877,6 +877,79 @@ td {
     0 10px 26px rgba(53, 110, 168, 0.09);
 }
 
+.property-manual {
+  padding: 14px;
+  border: 1px solid rgba(15, 143, 122, 0.28);
+  border-top: 3px solid var(--teal);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(244, 251, 248, 0.98), rgba(255, 251, 242, 0.94));
+  box-shadow: 0 10px 26px rgba(15, 143, 122, 0.08);
+}
+
+.property-item-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.property-item-button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font-weight: 800;
+}
+
+.property-item-button.selected {
+  color: white;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+}
+
+.property-expense-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.property-expense-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.property-expense-form input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
+}
+
+.property-expense-form button {
+  grid-column: 1 / -1;
+  min-height: 42px;
+}
+
+.property-manual-status {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .capital-detail-grid {
   display: grid;
   grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
@@ -1785,6 +1858,17 @@ td {
   font-size: 20px;
 }
 
+.property-category-empty {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: white;
+  font-weight: 700;
+  text-align: center;
+}
+
 .property-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -1935,6 +2019,8 @@ td {
   .payroll-overview,
   .capital-company-grid,
   .property-company-grid,
+  .property-item-actions,
+  .property-expense-form,
   .property-category-list,
   .payroll-company-grid,
   .bank-account-list,

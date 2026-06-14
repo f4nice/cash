@@ -1629,6 +1629,104 @@
     }, {});
   }
 
+  function selectedPropertyPeriod() {
+    return document.getElementById("propertyPeriod")?.value || currentPeriod();
+  }
+
+  function propertyPeriodStartDate() {
+    return `${selectedPropertyPeriod()}-01`;
+  }
+
+  function setPropertyExpenseType(type) {
+    const value = type || "房租";
+    const input = document.getElementById("propertyExpenseType");
+    if (input) input.value = value;
+    document.querySelectorAll("[data-property-type]").forEach((button) => {
+      button.classList.toggle("selected", button.dataset.propertyType === value);
+    });
+    setText("propertyImportStatus", `已选择：${value}`);
+  }
+
+  function syncPropertyExpenseDefaults() {
+    const company = companyData[state.selectedCompany];
+    const dateInput = document.getElementById("propertyExpenseDate");
+    const propertyInput = document.getElementById("propertyExpenseName");
+    if (dateInput && !dateInput.value) dateInput.value = propertyPeriodStartDate();
+    if (propertyInput && !propertyInput.value && company?.propertyExpenses?.length) {
+      propertyInput.placeholder = `例如：${company.propertyExpenses[0].property}`;
+    }
+  }
+
+  async function loadPropertySummary() {
+    if (!document.getElementById("property")) return;
+    try {
+      const period = selectedPropertyPeriod();
+      const response = await fetch(`/api/property/summary?period=${encodeURIComponent(period)}`);
+      if (!response.ok) throw new Error("property summary unavailable");
+      const data = await response.json();
+      (data.companies || []).forEach((company) => {
+        const key = companyCodeToKey[company.code];
+        if (!key || !companyData[key]) return;
+        companyData[key].propertyExpenses = (company.expenses || []).map((item) => ({
+          period: item.period || data.period || period,
+          date: item.date || "",
+          property: item.property || "未填写物业",
+          type: item.type || "物业费",
+          vendor: item.vendor || "-",
+          amount: Number(item.amount || 0)
+        }));
+      });
+      renderCompanySurfaces();
+      updateCompany(state.selectedCompany);
+    } catch (error) {
+      renderPropertyStats();
+    }
+  }
+
+  async function savePropertyExpense(event) {
+    event.preventDefault();
+    const company = companyData[state.selectedCompany];
+    if (!company) return;
+    const type = document.getElementById("propertyExpenseType")?.value || "房租";
+    const amount = parseAmount(document.getElementById("propertyExpenseAmount")?.value);
+    if (amount <= 0) {
+      setText("propertyImportStatus", "请输入大于 0 的金额");
+      return;
+    }
+    const row = {
+      period: selectedPropertyPeriod(),
+      date: document.getElementById("propertyExpenseDate")?.value || propertyPeriodStartDate(),
+      property: document.getElementById("propertyExpenseName")?.value.trim() || "未填写物业",
+      type,
+      vendor: document.getElementById("propertyExpenseVendor")?.value.trim() || "-",
+      amount
+    };
+    const button = document.querySelector("#propertyExpenseForm button[type='submit']");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "保存中";
+    }
+    try {
+      const result = await postJson("/api/import/property", {
+        company: selectedCompanyPayload(),
+        period: row.period,
+        rows: [row]
+      });
+      setText("propertyImportStatus", `${company.name} · 已保存 ${type} ${formatMoney(result.amount || amount)}`);
+      const amountInput = document.getElementById("propertyExpenseAmount");
+      if (amountInput) amountInput.value = "";
+      await loadPropertySummary();
+      await loadOverview();
+    } catch (error) {
+      setText("propertyImportStatus", error.message || "保存失败，请检查 MySQL");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "保存消费项目";
+      }
+    }
+  }
+
   function renderPropertyStats() {
     const company = companyData[state.selectedCompany];
     if (!company) return;
@@ -1641,10 +1739,12 @@
     const topType = Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0] || ["-", 0];
 
     setText("selectedPropertyCompanyBadge", company.name);
+    setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
     setText("propertyMonthlyTotal", formatMoney(allTotal));
     setText("propertyCompanyTotal", formatMoney(companyTotal));
     setText("propertyItemCount", `${companyRows.length} 项`);
     setText("propertyMainType", `${topType[0]} ${formatMoney(topType[1])}`);
+    syncPropertyExpenseDefaults();
 
     renderPropertyCompanyTable();
     renderPropertyCategoryBreakdown(typeTotals);
@@ -1677,6 +1777,10 @@
     if (!list) return;
 
     const entries = Object.entries(typeTotals).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) {
+      list.innerHTML = '<div class="property-category-empty">暂无费用项目</div>';
+      return;
+    }
     list.innerHTML = entries.map(([type, amount]) => `
       <div class="property-category-card">
         <span>${escapeHtml(type)}</span>
@@ -2397,6 +2501,12 @@
       node.addEventListener("click", () => document.getElementById("propertyFile")?.click());
     });
 
+    document.querySelectorAll("[data-property-type]").forEach((node) => {
+      node.addEventListener("click", () => setPropertyExpenseType(node.dataset.propertyType));
+    });
+
+    document.getElementById("propertyExpenseForm")?.addEventListener("submit", savePropertyExpense);
+
     document.querySelectorAll(".file-action[for]").forEach((node) => {
       node.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -2429,6 +2539,12 @@
     document.getElementById("propertyFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
       if (file) prepareUploadFile("property", file);
+    });
+
+    document.getElementById("propertyPeriod")?.addEventListener("change", () => {
+      const dateInput = document.getElementById("propertyExpenseDate");
+      if (dateInput) dateInput.value = propertyPeriodStartDate();
+      loadPropertySummary();
     });
 
     document.getElementById("payrollPeriod")?.addEventListener("change", handlePayrollPeriodChange);
@@ -2503,6 +2619,8 @@
     });
     bindEvents();
     await loadCompanies();
+    setPropertyExpenseType(document.getElementById("propertyExpenseType")?.value || "房租");
+    await loadPropertySummary();
     loadPayrollSummary();
     loadOverview();
   });

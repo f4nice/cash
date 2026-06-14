@@ -1495,6 +1495,83 @@ def import_property(payload):
     return {"importNo": import_no, "inserted": inserted, "amount": total}
 
 
+def property_type_label(value):
+    labels = {
+        "rent": "房租",
+        "property_management": "物业费",
+        "utilities": "水电煤",
+        "parking": "停车",
+        "repair": "维修",
+        "other": "其他",
+    }
+    return labels.get(str(value or ""), "其他")
+
+
+def load_property_summary(period_value):
+    period, start_day, end_day = month_bounds(period_value)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  p.expense_date,
+                  p.fee_period_start,
+                  p.property_name,
+                  p.vendor_name,
+                  p.expense_type,
+                  p.amount,
+                  p.description,
+                  p.source_doc_no,
+                  p.created_at
+                FROM companies c
+                LEFT JOIN property_expenses p
+                  ON p.company_id = c.id
+                 AND p.expense_date BETWEEN %s AND %s
+                WHERE c.status = 'active'
+                ORDER BY c.id, p.expense_date, p.id
+                """,
+                (start_day, end_day),
+            )
+            rows = cur.fetchall()
+
+    companies = []
+    by_code = {}
+    total = Decimal("0")
+    for row in rows:
+        code = row["company_code"]
+        if code not in by_code:
+            by_code[code] = {
+                "code": code,
+                "name": row["company_name"],
+                "total": Decimal("0"),
+                "itemCount": 0,
+                "expenses": [],
+            }
+            companies.append(by_code[code])
+        if not row.get("expense_date"):
+            continue
+        amount = row["amount"] or Decimal("0")
+        item_type = row.get("description") or property_type_label(row.get("expense_type"))
+        expense = {
+            "period": period,
+            "date": row["expense_date"],
+            "property": row["property_name"] or "未填写物业",
+            "type": item_type,
+            "vendor": row["vendor_name"] or "-",
+            "amount": amount,
+            "sourceDocNo": row["source_doc_no"],
+            "createdAt": row["created_at"],
+        }
+        by_code[code]["expenses"].append(expense)
+        by_code[code]["total"] += amount
+        by_code[code]["itemCount"] += 1
+        total += amount
+
+    return {"period": period, "total": total, "companies": companies}
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "CaishenyeHTTP/1.0"
 
@@ -1539,6 +1616,8 @@ class Handler(SimpleHTTPRequestHandler):
                 (query.get("bank") or [""])[0],
                 (query.get("accountName") or [""])[0],
             )
+        if method == "GET" and path == "/api/property/summary":
+            return load_property_summary((query.get("period") or [""])[0])
         if method == "POST" and path == "/api/companies":
             return save_company(self.read_json())
         if method == "POST" and path == "/api/companies/delete":
