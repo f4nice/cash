@@ -547,7 +547,7 @@ def load_payroll_salary_details(period_value, company_code=""):
                     SUBSTRING_INDEX(source_doc_no, '-', 2) AS import_no,
                     MIN(txn_date) AS booked_date
                   FROM cash_transactions
-                  WHERE source_doc_no LIKE 'PAYROLL-%'
+                  WHERE source_doc_no LIKE 'PAYROLL-%%'
                   GROUP BY company_id, SUBSTRING_INDEX(source_doc_no, '-', 2)
                 ) t ON t.company_id = b.company_id AND t.import_no = b.file_hash
                 WHERE b.period_month = %s AND b.status = 'confirmed'{company_filter}
