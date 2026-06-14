@@ -89,6 +89,22 @@
                 <label for="capitalSheetSelect"><span>选择Sheet</span><select id="capitalSheetSelect"></select></label>
                 <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
               </div>
+              <div class="column-mapping capital-column-mapping" id="capitalColumnMapping" hidden>
+                <div class="mapping-header">
+                  <div><span>列选择</span><strong>确认Excel列对应关系</strong></div>
+                  <button class="primary-button save-import-button" type="button" id="saveCapitalImport" disabled>保存导入</button>
+                </div>
+                <div class="mapping-grid">
+                  <label><span>日期</span><select data-capital-field="date"></select></label>
+                  <label><span>摘要</span><select data-capital-field="summary"></select></label>
+                  <label><span>对方户名</span><select data-capital-field="counterparty"></select></label>
+                  <label><span>流入</span><select data-capital-field="income"></select></label>
+                  <label><span>流出</span><select data-capital-field="expense"></select></label>
+                  <label><span>金额</span><select data-capital-field="amount"></select></label>
+                  <label><span>收支方向</span><select data-capital-field="direction"></select></label>
+                  <label><span>余额</span><select data-capital-field="balance"></select></label>
+                </div>
+              </div>
               <div class="import-summary capital-import-summary" aria-live="polite">
                 <div><span>读取流水</span><strong id="capitalImportRows">0 笔</strong></div>
                 <div><span>流入</span><strong id="capitalImportIn">¥ 0</strong></div>

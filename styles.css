@@ -1180,6 +1180,65 @@ td {
   font: inherit;
 }
 
+.column-mapping {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(15, 143, 122, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.column-mapping[hidden] {
+  display: none;
+}
+
+.mapping-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mapping-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.mapping-header span,
+.mapping-grid label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mapping-header strong {
+  font-size: 15px;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mapping-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.mapping-grid select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
+}
+
 .upload-zone {
   display: grid;
   place-items: center;
@@ -1509,6 +1568,7 @@ td {
   .property-actions,
   .payroll-actions,
   .section-title-row,
+  .mapping-header,
   .upload-card-actions,
   .upload-button-row {
     align-items: stretch;
@@ -1526,6 +1586,7 @@ td {
   .status-grid,
   .quick-link-grid,
   .sheet-control,
+  .mapping-grid,
   .capital-import-summary,
   .import-summary {
     grid-template-columns: 1fr;

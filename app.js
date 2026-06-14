@@ -97,7 +97,9 @@
   };
 
   let pendingPayrollImport = null;
+  let pendingCapitalImport = null;
   let payrollPreviewRows = [];
+  let capitalPreviewRows = [];
   let selectedPayrollRowIndexes = new Set();
   let selectedSalaryBatchIds = new Set();
   let latestPayrollSummary = null;
@@ -322,6 +324,7 @@
       pendingPayrollImport = null;
       hidePayrollPreview();
     }
+    if (kind === "capital") hideCapitalPreview();
 
     if (fileExt(file) === "csv") {
       hideSheetControl(kind);
@@ -344,6 +347,7 @@
         pendingPayrollImport = null;
         hidePayrollPreview();
       }
+      if (kind === "capital") hideCapitalPreview("请先选择Excel文件");
       setText(ui.statusId, "请先选择Excel文件");
       return;
     }
@@ -354,7 +358,7 @@
   }
 
   function mapColumns(rows, aliasesMap, headerPattern) {
-    if (!rows.length) return { columns: {}, startIndex: 0 };
+    if (!rows.length) return { columns: {}, startIndex: 0, headers: [], headerRowIndex: -1 };
     const headerRowIndex = rows.findIndex((row) => row.some((cell) => headerPattern.test(String(cell))));
     const headers = rows[headerRowIndex >= 0 ? headerRowIndex : 0] || [];
     const columns = Object.fromEntries(
@@ -362,7 +366,9 @@
     );
     return {
       columns,
-      startIndex: (headerRowIndex >= 0 ? headerRowIndex : 0) + 1
+      startIndex: (headerRowIndex >= 0 ? headerRowIndex : 0) + 1,
+      headers,
+      headerRowIndex
     };
   }
 
@@ -392,10 +398,10 @@
     }).filter((row) => row.name || row.gross || row.net);
   }
 
-  function mapCapitalRows(rows) {
+  function mapCapitalRows(rows, columnMap = null) {
     const company = companyData[state.selectedCompany];
     const account = getSelectedAccount();
-    const { columns, startIndex } = mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
+    const { columns, startIndex } = columnMap || mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
 
     return rows.slice(startIndex).map((row) => {
       const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
@@ -425,6 +431,50 @@
         balance: getMoney("balance")
       };
     }).filter((row) => row.date !== "未填日期" || row.income || row.expense || row.balance);
+  }
+
+  function renderCapitalColumnMapping(headers, columns) {
+    const panel = document.getElementById("capitalColumnMapping");
+    if (!panel) return;
+    const options = ['<option value="-1">不导入</option>'].concat(
+      headers.map((header, index) => {
+        const label = String(header || `第${index + 1}列`).trim() || `第${index + 1}列`;
+        return `<option value="${index}">${escapeHtml(label)}</option>`;
+      })
+    ).join("");
+
+    panel.querySelectorAll("[data-capital-field]").forEach((select) => {
+      const field = select.dataset.capitalField;
+      select.innerHTML = options;
+      select.value = String(Number.isInteger(columns[field]) ? columns[field] : -1);
+    });
+    setCapitalMappingVisible(true);
+  }
+
+  function selectedCapitalColumns() {
+    const columns = {};
+    document.querySelectorAll("[data-capital-field]").forEach((select) => {
+      columns[select.dataset.capitalField] = Number(select.value);
+    });
+    return columns;
+  }
+
+  function updateCapitalPreviewFromMapping() {
+    if (!pendingCapitalImport) return;
+    capitalPreviewRows = mapCapitalRows(pendingCapitalImport.rows, {
+      columns: selectedCapitalColumns(),
+      startIndex: pendingCapitalImport.startIndex
+    });
+    pendingCapitalImport.mappedRows = capitalPreviewRows;
+
+    const total = summarizeCapital(capitalPreviewRows);
+    setText("capitalImportRows", `${total.rows} 笔`);
+    setText("capitalImportIn", formatMoney(total.income));
+    setText("capitalImportOut", formatMoney(total.expense));
+    setText("capitalImportNet", formatMoney(total.net));
+    renderCapitalPreview(capitalPreviewRows);
+    renderCashFlowSummary(capitalPreviewRows);
+    setCapitalSaveButton(capitalPreviewRows.length > 0);
   }
 
   function mapPropertyRows(rows) {
@@ -545,6 +595,36 @@
     selectedPayrollRowIndexes = new Set();
     renderPayrollPreview([]);
     setPayrollSaveButton(false, label);
+  }
+
+  function setCapitalSaveButton(enabled, label = "保存导入") {
+    const button = document.getElementById("saveCapitalImport");
+    if (!button) return;
+    button.disabled = !enabled;
+    button.textContent = label;
+  }
+
+  function setCapitalMappingVisible(visible) {
+    const panel = document.getElementById("capitalColumnMapping");
+    if (panel) panel.hidden = !visible;
+  }
+
+  function resetCapitalImportSummary() {
+    setText("capitalImportRows", "0 笔");
+    setText("capitalImportIn", formatMoney(0));
+    setText("capitalImportOut", formatMoney(0));
+    setText("capitalImportNet", formatMoney(0));
+  }
+
+  function hideCapitalPreview(label = "等待上传") {
+    pendingCapitalImport = null;
+    capitalPreviewRows = [];
+    setCapitalMappingVisible(false);
+    setCapitalSaveButton(false, "保存导入");
+    resetCapitalImportSummary();
+    renderCapitalPreview([]);
+    renderCashFlowSummary([]);
+    setText("capitalImportStatus", label);
   }
 
   function escapeHtml(value) {
@@ -828,6 +908,7 @@
       pendingPayrollImport = null;
       hidePayrollPreview();
     }
+    if (pendingCapitalImport) hideCapitalPreview();
 
     setText("selectedCompanyBadge", company.name);
     setText("selectedCapitalCompanyBadge", company.name);
@@ -842,6 +923,7 @@
     const company = companyData[state.selectedCompany];
     const account = company.bankAccounts.find((item) => item.id === accountId);
     if (!account) return;
+    if (pendingCapitalImport) hideCapitalPreview();
     state.selectedAccount = accountId;
 
     document.querySelectorAll("[data-bank-account]").forEach((node) => {
@@ -1014,7 +1096,11 @@
 
   function renderCashFlowSummary(rows) {
     const tbody = document.getElementById("cashFlowBody");
-    if (!tbody || !rows.length) return;
+    if (!tbody) return;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">暂无导入预览</td></tr>';
+      return;
+    }
 
     const grouped = new Map();
     rows.forEach((row) => {
@@ -1092,32 +1178,48 @@
   async function readCapitalFile(file, sheetName = "") {
     setText("capitalUploadFileName", file.name);
     setText("capitalImportStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
+    pendingCapitalImport = null;
+    capitalPreviewRows = [];
+    setCapitalSaveButton(false, "读取中");
 
     const rows = await readSheetRows(file, "capitalImportStatus", sheetName);
-    const capitalRows = mapCapitalRows(rows);
-    const total = summarizeCapital(capitalRows);
+    const detected = mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
     const selectedCompany = companyData[state.selectedCompany];
 
-    setText("capitalImportRows", `${total.rows} 笔`);
-    setText("capitalImportIn", formatMoney(total.income));
-    setText("capitalImportOut", formatMoney(total.expense));
-    setText("capitalImportNet", formatMoney(total.net));
-    setText("capitalImportStatus", `${selectedCompany.name} · 已汇总${sheetName ? ` ${sheetName}` : ""}`);
-    renderCapitalPreview(capitalRows);
-    renderCashFlowSummary(capitalRows);
+    pendingCapitalImport = {
+      company: selectedCompanyPayload(),
+      account: selectedAccountPayload(),
+      fileName: file.name,
+      sheetName,
+      rows,
+      startIndex: detected.startIndex,
+      mappedRows: []
+    };
+    renderCapitalColumnMapping(detected.headers, detected.columns);
+    updateCapitalPreviewFromMapping();
+    setText("capitalImportStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}，请确认列后保存`);
+  }
 
+  async function saveCapitalImport() {
+    if (!pendingCapitalImport || !capitalPreviewRows.length) return;
+    const payload = {
+      company: pendingCapitalImport.company,
+      account: pendingCapitalImport.account,
+      fileName: pendingCapitalImport.fileName,
+      sheetName: pendingCapitalImport.sheetName,
+      rows: capitalPreviewRows
+    };
+    setCapitalSaveButton(false, "保存中");
     try {
-      const result = await postJson("/api/import/capital", {
-        company: selectedCompanyPayload(),
-        account: selectedAccountPayload(),
-        fileName: file.name,
-        sheetName,
-        rows: capitalRows
-      });
-      setText("capitalImportStatus", `${selectedCompany.name} · 已写入MySQL ${result.inserted} 笔`);
+      const result = await postJson("/api/import/capital", payload);
+      pendingCapitalImport = null;
+      setCapitalSaveButton(false, "已保存");
+      setText("capitalImportStatus", `${payload.company.name} · 已写入MySQL ${result.inserted} 笔`);
+      await loadCompanies();
       await loadOverview();
     } catch (error) {
-      setText("capitalImportStatus", `${selectedCompany.name} · 已本地预览，未连接MySQL`);
+      setCapitalSaveButton(true, "重试保存");
+      setText("capitalImportStatus", `${payload.company.name} · 保存失败，请检查MySQL连接`);
     }
   }
 
@@ -1630,6 +1732,10 @@
       if (file) prepareUploadFile("capital", file);
     });
 
+    document.getElementById("capitalFile")?.addEventListener("click", () => {
+      hideCapitalPreview();
+    });
+
     document.getElementById("propertyFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
       if (file) prepareUploadFile("property", file);
@@ -1670,6 +1776,12 @@
     });
 
     document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);
+    document.getElementById("saveCapitalImport")?.addEventListener("click", saveCapitalImport);
+
+    document.getElementById("capitalColumnMapping")?.addEventListener("change", (event) => {
+      if (!event.target.matches("[data-capital-field]")) return;
+      updateCapitalPreviewFromMapping();
+    });
 
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);
     document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
