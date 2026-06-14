@@ -704,6 +704,7 @@
 
     setText("importRows", `${total.rows} 人`);
     setText("importCost", formatMoney(total.totalCost));
+    setText("importTax", formatMoney(total.tax));
     setText("importSocialFund", formatMoney(
       total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
     ));

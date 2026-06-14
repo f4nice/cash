@@ -986,6 +986,10 @@ td {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.payroll-upload .import-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .cashflow-table-wrap table {
   min-width: 1080px;
 }
