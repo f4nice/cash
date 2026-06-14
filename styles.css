@@ -790,6 +790,10 @@ td {
   background: rgba(247, 250, 249, 0.76);
 }
 
+.payroll-preview[hidden] {
+  display: none;
+}
+
 .capital-upload,
 .payroll-upload,
 .property-upload {

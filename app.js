@@ -320,10 +320,7 @@
     setText(ui.fileNameId, file.name);
     if (kind === "payroll") {
       pendingPayrollImport = null;
-      payrollPreviewRows = [];
-      selectedPayrollRowIndexes = new Set();
-      renderPayrollPreview([]);
-      setPayrollSaveButton(false);
+      hidePayrollPreview();
     }
 
     if (fileExt(file) === "csv") {
@@ -345,7 +342,7 @@
     if (!file) {
       if (kind === "payroll") {
         pendingPayrollImport = null;
-        setPayrollSaveButton(false, "保存");
+        hidePayrollPreview();
       }
       setText(ui.statusId, "请先选择Excel文件");
       return;
@@ -536,6 +533,18 @@
     if (!button) return;
     button.disabled = !enabled;
     button.textContent = label;
+  }
+
+  function setPayrollPreviewVisible(visible) {
+    const panel = document.getElementById("payrollPreviewPanel");
+    if (panel) panel.hidden = !visible;
+  }
+
+  function hidePayrollPreview(label = "保存") {
+    payrollPreviewRows = [];
+    selectedPayrollRowIndexes = new Set();
+    renderPayrollPreview([]);
+    setPayrollSaveButton(false, label);
   }
 
   function escapeHtml(value) {
@@ -817,10 +826,7 @@
     syncCompanySelection();
     if (pendingPayrollImport) {
       pendingPayrollImport = null;
-      payrollPreviewRows = [];
-      selectedPayrollRowIndexes = new Set();
-      renderPayrollPreview([]);
-      setPayrollSaveButton(false, "保存");
+      hidePayrollPreview();
     }
 
     setText("selectedCompanyBadge", company.name);
@@ -959,6 +965,7 @@
   function renderPayrollPreview(rows) {
     const tbody = document.getElementById("payrollPreviewBody");
     if (!tbody) return;
+    setPayrollPreviewVisible(rows.length > 0);
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="9">暂无导入数据</td></tr>';
       updatePayrollSelectionSummary();
@@ -1050,6 +1057,7 @@
     pendingPayrollImport = null;
     payrollPreviewRows = [];
     selectedPayrollRowIndexes = new Set();
+    setPayrollPreviewVisible(false);
     setPayrollSaveButton(false, "读取中");
 
     const rows = await readSheetRows(file, null, sheetName);
@@ -1073,6 +1081,7 @@
       const result = await postJson("/api/import/payroll", pendingPayrollImport);
       pendingPayrollImport = null;
       setPayrollSaveButton(false, `已保存 ${result.rows}人`);
+      hidePayrollPreview(`已保存 ${result.rows}人`);
       await loadOverview();
       await loadPayrollSummary();
     } catch (error) {
@@ -1604,6 +1613,11 @@
         event.preventDefault();
         document.getElementById(node.getAttribute("for"))?.click();
       });
+    });
+
+    document.getElementById("payrollFile")?.addEventListener("click", () => {
+      pendingPayrollImport = null;
+      hidePayrollPreview();
     });
 
     document.getElementById("payrollFile")?.addEventListener("change", (event) => {
