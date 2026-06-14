@@ -17,7 +17,13 @@
         employeeFund: 4200,
         employerFund: 4200,
         totalCost: 78450
-      }
+      },
+      propertyExpenses: [
+        { property: "总部办公室", type: "房租", vendor: "办公楼业主", amount: 12000, period: "2026-06" },
+        { property: "总部办公室", type: "物业费", vendor: "物业公司甲", amount: 3500, period: "2026-06" },
+        { property: "总部办公室", type: "水电", vendor: "供电/供水", amount: 2100, period: "2026-06" },
+        { property: "总部办公室", type: "停车", vendor: "停车场", amount: 1000, period: "2026-06" }
+      ]
     },
     trade: {
       name: "示例贸易",
@@ -35,7 +41,13 @@
         employeeFund: 2800,
         employerFund: 2800,
         totalCost: 54800
-      }
+      },
+      propertyExpenses: [
+        { property: "贸易仓库", type: "房租", vendor: "仓储园区", amount: 5000, period: "2026-06" },
+        { property: "贸易仓库", type: "物业费", vendor: "仓储物业", amount: 1200, period: "2026-06" },
+        { property: "贸易仓库", type: "水电", vendor: "园区水电", amount: 800, period: "2026-06" },
+        { property: "贸易仓库", type: "维修", vendor: "维修服务商", amount: 200, period: "2026-06" }
+      ]
     },
     holding: {
       name: "控股主体",
@@ -53,7 +65,12 @@
         employeeFund: 1800,
         employerFund: 1800,
         totalCost: 43600
-      }
+      },
+      propertyExpenses: [
+        { property: "控股办公室", type: "停车", vendor: "停车场", amount: 1200, period: "2026-06" },
+        { property: "控股办公室", type: "水电", vendor: "供电/供水", amount: 700, period: "2026-06" },
+        { property: "控股办公室", type: "维修", vendor: "维修服务商", amount: 500, period: "2026-06" }
+      ]
     }
   };
 
@@ -277,6 +294,7 @@
     setText("selectedCapitalCompanyBadge", company.name);
     setText("capitalUploadCompanyBadge", `当前公司：${company.name}`);
     renderBankAccounts();
+    renderPropertyStats();
   }
 
   function updateBankAccount(accountId) {
@@ -312,6 +330,95 @@
     });
 
     updateBankAccount(state.selectedAccount);
+  }
+
+  function sumProperty(company) {
+    return company.propertyExpenses.reduce((total, item) => total + item.amount, 0);
+  }
+
+  function allPropertyRows() {
+    return Object.values(companyData).flatMap((company) => (
+      company.propertyExpenses.map((item) => ({ ...item, company: company.name }))
+    ));
+  }
+
+  function groupPropertyByType(rows) {
+    return rows.reduce((groups, item) => {
+      groups[item.type] = (groups[item.type] || 0) + item.amount;
+      return groups;
+    }, {});
+  }
+
+  function renderPropertyStats() {
+    const company = companyData[state.selectedCompany];
+    if (!company) return;
+
+    const companyRows = company.propertyExpenses;
+    const allRows = allPropertyRows();
+    const allTotal = allRows.reduce((total, item) => total + item.amount, 0);
+    const companyTotal = sumProperty(company);
+    const typeTotals = groupPropertyByType(companyRows);
+    const topType = Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0] || ["-", 0];
+
+    setText("selectedPropertyCompanyBadge", company.name);
+    setText("propertyMonthlyTotal", formatMoney(allTotal));
+    setText("propertyCompanyTotal", formatMoney(companyTotal));
+    setText("propertyItemCount", `${companyRows.length} 项`);
+    setText("propertyMainType", `${topType[0]} ${formatMoney(topType[1])}`);
+
+    renderPropertyCompanyTable();
+    renderPropertyCategoryBreakdown(typeTotals);
+    renderPropertyDetailTable(companyRows, company.name);
+  }
+
+  function renderPropertyCompanyTable() {
+    const tbody = document.getElementById("propertyCompanyBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = Object.entries(companyData).map(([key, company]) => {
+      const total = sumProperty(company);
+      const types = Object.keys(groupPropertyByType(company.propertyExpenses)).join("、");
+      const propertyNames = Array.from(new Set(company.propertyExpenses.map((item) => item.property))).join("、");
+
+      return `
+        <tr class="${key === state.selectedCompany ? "selected-row" : ""}">
+          <td>${escapeHtml(company.name)}</td>
+          <td>${escapeHtml(propertyNames)}</td>
+          <td>${escapeHtml(types)}</td>
+          <td>${company.propertyExpenses.length} 项</td>
+          <td class="positive">${formatMoney(total)}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderPropertyCategoryBreakdown(typeTotals) {
+    const list = document.getElementById("propertyCategoryList");
+    if (!list) return;
+
+    const entries = Object.entries(typeTotals).sort((a, b) => b[1] - a[1]);
+    list.innerHTML = entries.map(([type, amount]) => `
+      <div class="property-category-card">
+        <span>${escapeHtml(type)}</span>
+        <strong>${formatMoney(amount)}</strong>
+      </div>
+    `).join("");
+  }
+
+  function renderPropertyDetailTable(rows, companyName) {
+    const tbody = document.getElementById("propertyDetailBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = rows.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.period)}</td>
+        <td>${escapeHtml(companyName)}</td>
+        <td>${escapeHtml(item.property)}</td>
+        <td>${escapeHtml(item.type)}</td>
+        <td>${escapeHtml(item.vendor)}</td>
+        <td class="positive">${formatMoney(item.amount)}</td>
+      </tr>
+    `).join("");
   }
 
   function renderPayrollPreview(rows) {

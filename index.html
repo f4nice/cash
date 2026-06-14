@@ -459,27 +459,124 @@
           </div>
         </section>
 
-        <section class="panel span-6" id="property" aria-labelledby="property-title">
+        <section class="panel span-12 property-workspace" id="property" aria-labelledby="property-title">
           <div class="panel-header">
             <div>
               <p class="eyebrow">物业费用</p>
-              <h2 id="property-title">物业、房租、水电</h2>
+              <h2 id="property-title">每月物业统计</h2>
             </div>
-            <button class="ghost-button" type="button">新增费用</button>
+            <div class="property-actions">
+              <button class="ghost-button" type="button">导出月报</button>
+              <button class="primary-button" type="button">新增费用</button>
+            </div>
           </div>
-          <div class="property-map" aria-label="物业费分布">
-            <div class="property-item large">
-              <span>总部办公室</span>
-              <strong>¥ 18,600</strong>
-            </div>
-            <div class="property-item">
-              <span>仓库</span>
-              <strong>¥ 7,200</strong>
-            </div>
-            <div class="property-item">
-              <span>停车</span>
-              <strong>¥ 2,400</strong>
-            </div>
+
+          <div class="property-overview" aria-label="物业费用总览">
+            <article>
+              <span>本月物业合计</span>
+              <strong id="propertyMonthlyTotal">¥ 28,200</strong>
+            </article>
+            <article>
+              <span>当前公司</span>
+              <strong id="propertyCompanyTotal">¥ 18,600</strong>
+            </article>
+            <article>
+              <span>费用项目</span>
+              <strong id="propertyItemCount">4 项</strong>
+            </article>
+            <article>
+              <span>主要费用</span>
+              <strong id="propertyMainType">房租 ¥ 12,000</strong>
+            </article>
+          </div>
+
+          <div class="property-layout">
+            <section class="property-company-panel" aria-labelledby="property-company-title">
+              <div class="section-title-row">
+                <div>
+                  <p class="eyebrow">各公司情况</p>
+                  <h3 id="property-company-title">每家公司物业所属费用</h3>
+                </div>
+                <span id="selectedPropertyCompanyBadge">示例科技</span>
+              </div>
+
+              <div class="property-company-grid">
+                <button class="property-company-card selected" type="button" data-company="tech">
+                  <span>示例科技</span>
+                  <strong>¥ 18,600</strong>
+                  <small>总部办公室 · 房租/物业/水电/停车</small>
+                </button>
+                <button class="property-company-card" type="button" data-company="trade">
+                  <span>示例贸易</span>
+                  <strong>¥ 7,200</strong>
+                  <small>贸易仓库 · 房租/物业/水电/维修</small>
+                </button>
+                <button class="property-company-card" type="button" data-company="holding">
+                  <span>控股主体</span>
+                  <strong>¥ 2,400</strong>
+                  <small>控股办公室 · 停车/水电/维修</small>
+                </button>
+              </div>
+            </section>
+
+            <section class="property-breakdown-panel" aria-labelledby="property-breakdown-title">
+              <div class="section-title-row">
+                <div>
+                  <p class="eyebrow">费用分类</p>
+                  <h3 id="property-breakdown-title">当前公司费用结构</h3>
+                </div>
+              </div>
+              <div class="property-category-list" id="propertyCategoryList"></div>
+            </section>
+          </div>
+
+          <div class="property-detail-grid">
+            <section class="property-table-panel" aria-labelledby="property-company-table-title">
+              <div class="section-title-row compact">
+                <div>
+                  <p class="eyebrow">月度汇总</p>
+                  <h3 id="property-company-table-title">各公司物业费用</h3>
+                </div>
+              </div>
+              <div class="table-wrap property-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>公司</th>
+                      <th>物业所属</th>
+                      <th>费用类型</th>
+                      <th>项目数</th>
+                      <th>本月费用</th>
+                    </tr>
+                  </thead>
+                  <tbody id="propertyCompanyBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="property-table-panel" aria-labelledby="property-detail-title">
+              <div class="section-title-row compact">
+                <div>
+                  <p class="eyebrow">明细</p>
+                  <h3 id="property-detail-title">当前公司物业费用明细</h3>
+                </div>
+              </div>
+              <div class="table-wrap property-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>月份</th>
+                      <th>公司</th>
+                      <th>物业所属</th>
+                      <th>费用类型</th>
+                      <th>收款方</th>
+                      <th>金额</th>
+                    </tr>
+                  </thead>
+                  <tbody id="propertyDetailBody"></tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </section>
 

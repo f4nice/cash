@@ -771,6 +771,139 @@ td {
   min-width: 980px;
 }
 
+.property-workspace {
+  min-height: 0;
+}
+
+.property-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.property-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.property-overview article {
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.property-overview span {
+  color: var(--muted);
+}
+
+.property-overview strong {
+  font-size: 23px;
+}
+
+.property-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.property-company-panel,
+.property-breakdown-panel,
+.property-table-panel {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 250, 249, 0.76);
+}
+
+.property-company-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.property-company-card {
+  display: grid;
+  gap: 7px;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  text-align: left;
+}
+
+.property-company-card.selected {
+  border-color: rgba(15, 143, 122, 0.58);
+  background: #eef8f5;
+  box-shadow: inset 0 0 0 1px rgba(15, 143, 122, 0.16);
+}
+
+.property-company-card span,
+.property-company-card small {
+  color: var(--muted);
+}
+
+.property-company-card strong {
+  font-size: 22px;
+}
+
+.property-category-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.property-category-card {
+  display: grid;
+  gap: 8px;
+  min-height: 84px;
+  padding: 14px;
+  border-radius: 8px;
+  color: white;
+  background: linear-gradient(135deg, var(--teal-dark), var(--blue));
+}
+
+.property-category-card:nth-child(2) {
+  background: linear-gradient(135deg, var(--amber), #4e8f84);
+}
+
+.property-category-card:nth-child(3) {
+  background: linear-gradient(135deg, var(--blue), #4e8f84);
+}
+
+.property-category-card:nth-child(4) {
+  background: linear-gradient(135deg, var(--red), var(--amber));
+}
+
+.property-category-card span {
+  font-size: 13px;
+}
+
+.property-category-card strong {
+  font-size: 20px;
+}
+
+.property-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 14px;
+}
+
+.property-table-wrap table {
+  min-width: 760px;
+}
+
+.selected-row {
+  background: #eef8f5;
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -808,7 +941,9 @@ td {
   }
 
   .capital-layout,
-  .capital-detail-grid {
+  .capital-detail-grid,
+  .property-layout,
+  .property-detail-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -863,6 +998,7 @@ td {
   }
 
   .capital-actions,
+  .property-actions,
   .payroll-actions,
   .section-title-row {
     align-items: stretch;
@@ -870,8 +1006,11 @@ td {
   }
 
   .capital-overview,
+  .property-overview,
   .payroll-overview,
   .capital-company-grid,
+  .property-company-grid,
+  .property-category-list,
   .payroll-company-grid,
   .bank-account-list,
   .capital-import-summary,
@@ -880,6 +1019,7 @@ td {
   }
 
   .capital-layout,
+  .property-layout,
   .payroll-layout {
     grid-template-columns: 1fr;
   }
