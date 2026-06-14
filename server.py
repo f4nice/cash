@@ -501,6 +501,95 @@ def load_payroll_summary(period_value):
     return {"period": period, "companies": companies, **totals}
 
 
+def load_payroll_employees(period_value, company_code=""):
+    period, _, _ = month_bounds(period_value)
+    params = [period, period]
+    company_filter = ""
+    if company_code:
+        company_filter = " AND c.company_code = %s"
+        params.append(company_code)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  r.employee_no_raw,
+                  r.employee_name_raw,
+                  r.gross_salary,
+                  r.net_salary,
+                  r.individual_income_tax,
+                  r.employee_social_security,
+                  r.employer_social_security,
+                  r.employee_housing_fund,
+                  r.employer_housing_fund,
+                  r.total_company_cost,
+                  r.source_row_no
+                FROM payroll_records r
+                JOIN payroll_import_batches b ON b.id = r.batch_id
+                JOIN companies c ON c.id = r.company_id
+                JOIN (
+                  SELECT company_id, MAX(id) AS batch_id
+                  FROM payroll_import_batches
+                  WHERE period_month = %s AND status = 'confirmed'
+                  GROUP BY company_id
+                ) latest ON latest.batch_id = b.id
+                WHERE r.period_month = %s{company_filter}
+                ORDER BY c.id, r.source_row_no, r.id
+                """,
+                params,
+            )
+            rows = cur.fetchall()
+
+    employees = []
+    totals = {
+        "employeeCount": 0,
+        "netSalary": Decimal("0"),
+        "tax": Decimal("0"),
+        "social": Decimal("0"),
+        "fund": Decimal("0"),
+        "companyCost": Decimal("0"),
+    }
+    for row in rows:
+        employee_social = row["employee_social_security"] or Decimal("0")
+        employer_social = row["employer_social_security"] or Decimal("0")
+        employee_fund = row["employee_housing_fund"] or Decimal("0")
+        employer_fund = row["employer_housing_fund"] or Decimal("0")
+        net_salary = row["net_salary"] or Decimal("0")
+        tax = row["individual_income_tax"] or Decimal("0")
+        company_cost = row["total_company_cost"] or Decimal("0")
+        fund_total = employee_fund + employer_fund
+        social_total = employee_social + employer_social
+        totals["employeeCount"] += 1
+        totals["netSalary"] += net_salary
+        totals["tax"] += tax
+        totals["social"] += social_total
+        totals["fund"] += fund_total
+        totals["companyCost"] += company_cost
+        employees.append(
+            {
+                "companyCode": row["company_code"],
+                "companyName": row["company_name"],
+                "employeeNo": row["employee_no_raw"],
+                "employeeName": row["employee_name_raw"],
+                "grossSalary": row["gross_salary"] or Decimal("0"),
+                "netSalary": net_salary,
+                "tax": tax,
+                "employeeSocial": employee_social,
+                "employerSocial": employer_social,
+                "socialTotal": social_total,
+                "employeeFund": employee_fund,
+                "employerFund": employer_fund,
+                "fundTotal": fund_total,
+                "companyCost": company_cost,
+                "sourceRowNo": row["source_row_no"],
+            }
+        )
+    return {"period": period, "employees": employees, **totals}
+
+
 def insert_cash(cur, company_id, account_id, txn_date, direction, category, amount, counterparty="", description="", doc_no=None):
     amount = parse_amount(amount)
     if amount <= 0:
@@ -808,6 +897,8 @@ class Handler(SimpleHTTPRequestHandler):
             return load_companies()
         if method == "GET" and path == "/api/payroll/summary":
             return load_payroll_summary((query.get("period") or [""])[0])
+        if method == "GET" and path == "/api/payroll/employees":
+            return load_payroll_employees((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "POST" and path == "/api/companies":
             return save_company(self.read_json())
         if method == "POST" and path == "/api/import/capital":

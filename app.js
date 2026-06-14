@@ -1172,6 +1172,97 @@
     });
   }
 
+  function ensurePayrollEmployeeDialog() {
+    if (document.getElementById("payrollEmployeeDialog")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="employee-dialog-backdrop" id="payrollEmployeeDialog" hidden>
+        <section class="employee-dialog" role="dialog" aria-modal="true" aria-labelledby="payrollEmployeeDialogTitle">
+          <div class="section-title-row">
+            <div><p class="eyebrow">员工明细</p><h3 id="payrollEmployeeDialogTitle">本月员工列表</h3></div>
+            <button class="ghost-button" type="button" id="closePayrollEmployees">关闭</button>
+          </div>
+          <div class="employee-dialog-summary" id="payrollEmployeeDialogSummary"></div>
+          <div class="table-wrap employee-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>公司</th>
+                  <th>员工</th>
+                  <th>应发工资</th>
+                  <th>实发工资</th>
+                  <th>个税</th>
+                  <th>个人社保</th>
+                  <th>公司社保</th>
+                  <th>公积金合计</th>
+                  <th>公司人工成本</th>
+                </tr>
+              </thead>
+              <tbody id="payrollEmployeeListBody"><tr><td colspan="9">暂无员工数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    `);
+    document.getElementById("closePayrollEmployees")?.addEventListener("click", closePayrollEmployees);
+    document.getElementById("payrollEmployeeDialog")?.addEventListener("click", (event) => {
+      if (event.target.id === "payrollEmployeeDialog") closePayrollEmployees();
+    });
+  }
+
+  function closePayrollEmployees() {
+    const dialog = document.getElementById("payrollEmployeeDialog");
+    if (dialog) dialog.hidden = true;
+  }
+
+  function renderPayrollEmployeeList(data) {
+    const summary = document.getElementById("payrollEmployeeDialogSummary");
+    const tbody = document.getElementById("payrollEmployeeListBody");
+    const employees = data.employees || [];
+    if (summary) {
+      summary.innerHTML = `
+        <article><span>员工</span><strong>${Number(data.employeeCount || 0)} 人</strong></article>
+        <article><span>实发工资</span><strong>${formatMoney(data.netSalary)}</strong></article>
+        <article><span>个税</span><strong>${formatMoney(data.tax)}</strong></article>
+        <article><span>社保公积金</span><strong>${formatMoney(Number(data.social || 0) + Number(data.fund || 0))}</strong></article>
+      `;
+    }
+    if (!tbody) return;
+    if (!employees.length) {
+      tbody.innerHTML = '<tr><td colspan="9">暂无员工数据</td></tr>';
+      return;
+    }
+    tbody.innerHTML = employees.map((employee) => `
+      <tr>
+        <td>${escapeHtml(employee.companyName || "-")}</td>
+        <td>${escapeHtml(employee.employeeName || "-")}</td>
+        <td>${formatMoney(employee.grossSalary)}</td>
+        <td>${formatMoney(employee.netSalary)}</td>
+        <td>${formatMoney(employee.tax)}</td>
+        <td>${formatMoney(employee.employeeSocial)}</td>
+        <td>${formatMoney(employee.employerSocial)}</td>
+        <td>${formatMoney(employee.fundTotal)}</td>
+        <td>${formatMoney(employee.companyCost)}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function openPayrollEmployees() {
+    ensurePayrollEmployeeDialog();
+    const dialog = document.getElementById("payrollEmployeeDialog");
+    const tbody = document.getElementById("payrollEmployeeListBody");
+    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
+    if (dialog) dialog.hidden = false;
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9">读取中</td></tr>';
+    try {
+      const response = await fetch(`/api/payroll/employees?period=${encodeURIComponent(period)}`);
+      if (!response.ok) throw new Error("employees unavailable");
+      const data = await response.json();
+      renderPayrollEmployeeList(data);
+    } catch (error) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9">员工列表读取失败</td></tr>';
+    }
+  }
+
   async function loadPayrollSummary() {
     if (!document.getElementById("payrollEmployeeCount")) return;
     const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
@@ -1319,6 +1410,7 @@
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);
     document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
     document.getElementById("downloadPropertyTemplate")?.addEventListener("click", downloadPropertyTemplate);
+    document.getElementById("openPayrollEmployees")?.addEventListener("click", openPayrollEmployees);
 
     document.querySelectorAll(".nav-item").forEach((node) => {
       node.addEventListener("click", () => {

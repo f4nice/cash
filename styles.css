@@ -696,14 +696,26 @@ td {
 }
 
 .capital-overview article,
-.payroll-overview article {
+.payroll-overview article,
+.payroll-overview-card {
   display: grid;
   gap: 8px;
   min-height: 92px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  color: var(--ink);
   background: #f7faf9;
+  text-align: left;
+}
+
+.payroll-overview-card {
+  cursor: pointer;
+}
+
+.payroll-overview-card:hover {
+  border-color: rgba(15, 143, 122, 0.4);
+  background: #eef8f5;
 }
 
 .capital-overview span,
@@ -715,7 +727,8 @@ td {
 }
 
 .capital-overview strong,
-.payroll-overview strong {
+.payroll-overview strong,
+.payroll-overview-card strong {
   font-size: 23px;
 }
 
@@ -920,6 +933,65 @@ td {
   grid-row: span 2;
   color: var(--teal-dark);
   font-size: 13px;
+}
+
+.employee-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 20, 20, 0.24);
+}
+
+.employee-dialog-backdrop[hidden] {
+  display: none;
+}
+
+.employee-dialog {
+  width: min(1180px, 100%);
+  max-height: 86vh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 24px 60px rgba(12, 34, 34, 0.2);
+}
+
+.employee-dialog-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.employee-dialog-summary article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.employee-dialog-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.employee-dialog-summary strong {
+  font-size: 20px;
+}
+
+.employee-table-wrap {
+  max-height: 58vh;
+}
+
+.employee-table-wrap table {
+  min-width: 1120px;
 }
 
 .upload-button-row {
