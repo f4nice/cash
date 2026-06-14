@@ -82,9 +82,13 @@
     selectedAccount: "tech-cmb-basic"
   };
 
-  const companyCodeToKey = Object.fromEntries(
-    Object.entries(companyData).map(([key, company]) => [company.code, key])
-  );
+  function buildCompanyCodeToKey() {
+    return Object.fromEntries(
+      Object.entries(companyData).map(([key, company]) => [company.code, key])
+    );
+  }
+
+  let companyCodeToKey = buildCompanyCodeToKey();
 
   const selectedUploadFiles = {
     capital: null,
@@ -466,18 +470,274 @@
       .replace(/'/g, "&#039;");
   }
 
+  function companyEntries() {
+    return Object.entries(companyData);
+  }
+
+  function normalizeCompany(raw, index) {
+    const code = String(raw.code || `C${String(index + 1).padStart(3, "0")}`).trim();
+    const previousKey = companyCodeToKey[code];
+    const previous = previousKey ? companyData[previousKey] : {};
+    const bankAccounts = (raw.bankAccounts || []).map((account, accountIndex) => ({
+      id: account.id || `${code}-account-${accountIndex + 1}`,
+      bank: account.bank || "默认银行",
+      accountName: account.accountName || "基本户",
+      balance: Number(account.balance || 0)
+    }));
+
+    return {
+      code,
+      name: raw.name || code,
+      funds: Number(raw.funds || 0),
+      bankAccounts: bankAccounts.length ? bankAccounts : [{ id: `${code}-default`, bank: "默认银行", accountName: "基本户", balance: 0 }],
+      payroll: previous.payroll || {
+        employees: 0,
+        netSalary: 0,
+        tax: 0,
+        employeeSocial: 0,
+        employerSocial: 0,
+        employeeFund: 0,
+        employerFund: 0,
+        totalCost: 0
+      },
+      propertyExpenses: previous.propertyExpenses || []
+    };
+  }
+
+  function replaceCompanyData(companies) {
+    const normalized = {};
+    companies.forEach((company, index) => {
+      const item = normalizeCompany(company, index);
+      normalized[item.code] = item;
+    });
+    if (!Object.keys(normalized).length) return;
+    Object.keys(companyData).forEach((key) => delete companyData[key]);
+    Object.assign(companyData, normalized);
+    companyCodeToKey = buildCompanyCodeToKey();
+    if (!companyData[state.selectedCompany]) {
+      state.selectedCompany = Object.keys(companyData)[0];
+    }
+    if (!companyData[state.selectedCompany].bankAccounts.some((account) => account.id === state.selectedAccount)) {
+      state.selectedAccount = companyData[state.selectedCompany].bankAccounts[0]?.id;
+    }
+  }
+
+  function ensureCompanyPanelControls() {
+    document.querySelectorAll(".company-panel").forEach((panel) => {
+      const title = panel.querySelector("h2");
+      if (title && !panel.querySelector(".company-panel-title")) {
+        const titleRow = document.createElement("div");
+        titleRow.className = "company-panel-title";
+        title.replaceWith(titleRow);
+        titleRow.appendChild(title);
+        const manageButton = document.createElement("button");
+        manageButton.className = "company-manage-button";
+        manageButton.type = "button";
+        manageButton.textContent = "管理";
+        manageButton.addEventListener("click", openCompanyManager);
+        titleRow.appendChild(manageButton);
+      }
+
+      if (!panel.querySelector(".company-list")) {
+        const list = document.createElement("div");
+        list.className = "company-list";
+        Array.from(panel.children).forEach((child) => {
+          if (child.classList?.contains("company-row")) list.appendChild(child);
+        });
+        panel.appendChild(list);
+      }
+    });
+  }
+
+  function renderSidebarCompanies() {
+    ensureCompanyPanelControls();
+    document.querySelectorAll(".company-list").forEach((list) => {
+      list.innerHTML = companyEntries().map(([key, company]) => `
+        <button class="company-row${key === state.selectedCompany ? " selected" : ""}" type="button" data-company="${escapeHtml(key)}">
+          <span>${escapeHtml(company.name)}</span>
+          <strong>${formatMoney(company.funds)}</strong>
+        </button>
+      `).join("");
+      list.querySelectorAll("[data-company]").forEach((button) => {
+        button.addEventListener("click", () => updateCompany(button.dataset.company));
+      });
+    });
+  }
+
+  function renderPayrollCompanyOptions() {
+    const select = document.getElementById("payrollCompanySelect");
+    if (!select) return;
+    select.innerHTML = companyEntries().map(([key, company]) => (
+      `<option value="${escapeHtml(key)}">${escapeHtml(company.name)}</option>`
+    )).join("");
+    select.value = state.selectedCompany;
+  }
+
+  function renderBaseCompanyCards() {
+    const payrollGrid = document.querySelector(".payroll-company-grid");
+    if (payrollGrid) {
+      payrollGrid.innerHTML = companyEntries().map(([key, company]) => `
+        <button class="payroll-company-card${key === state.selectedCompany ? " selected" : ""}" type="button" data-company="${escapeHtml(key)}">
+          <span>${escapeHtml(company.name)}</span>
+          <strong>${formatMoney(0)}</strong>
+          <small>0人 · 社保公积金 ${formatMoney(0)}</small>
+        </button>
+      `).join("");
+    }
+
+    const capitalGrid = document.querySelector(".capital-company-grid");
+    if (capitalGrid) {
+      capitalGrid.innerHTML = companyEntries().map(([key, company]) => {
+        const bankNames = company.bankAccounts.map((account) => account.bank).filter(Boolean).join("、") || "默认银行";
+        return `
+          <button class="capital-company-card${key === state.selectedCompany ? " selected" : ""}" type="button" data-company="${escapeHtml(key)}">
+            <span>${escapeHtml(company.name)}</span>
+            <strong>${formatMoney(company.funds)}</strong>
+            <small>${escapeHtml(bankNames)}</small>
+          </button>
+        `;
+      }).join("");
+    }
+
+    const propertyGrid = document.querySelector(".property-company-grid");
+    if (propertyGrid) {
+      propertyGrid.innerHTML = companyEntries().map(([key, company]) => {
+        const total = sumProperty(company);
+        const propertyNames = Array.from(new Set(company.propertyExpenses.map((item) => item.property))).join("、") || "未录入物业";
+        return `
+          <button class="property-company-card${key === state.selectedCompany ? " selected" : ""}" type="button" data-company="${escapeHtml(key)}">
+            <span>${escapeHtml(company.name)}</span>
+            <strong>${formatMoney(total)}</strong>
+            <small>${escapeHtml(propertyNames)}</small>
+          </button>
+        `;
+      }).join("");
+    }
+
+    document.querySelectorAll(".payroll-company-grid [data-company], .capital-company-grid [data-company], .property-company-grid [data-company]").forEach((button) => {
+      button.addEventListener("click", () => updateCompany(button.dataset.company));
+    });
+  }
+
+  function renderCompanySurfaces() {
+    renderSidebarCompanies();
+    renderPayrollCompanyOptions();
+    renderBaseCompanyCards();
+  }
+
+  function syncCompanySelection() {
+    document.querySelectorAll("[data-company]").forEach((node) => {
+      node.classList.toggle("selected", node.dataset.company === state.selectedCompany);
+    });
+    const payrollCompanySelect = document.getElementById("payrollCompanySelect");
+    if (payrollCompanySelect) payrollCompanySelect.value = state.selectedCompany;
+  }
+
+  function ensureCompanyManager() {
+    if (document.getElementById("companyManager")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="company-manager-backdrop" id="companyManager" hidden>
+        <section class="company-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="companyManagerTitle">
+          <div class="section-title-row">
+            <div><p class="eyebrow">公司档案</p><h3 id="companyManagerTitle">我的公司</h3></div>
+            <button class="ghost-button" type="button" id="closeCompanyManager">关闭</button>
+          </div>
+          <form class="company-manager-form" id="companyManagerForm">
+            <input type="hidden" id="companyManagerCode">
+            <label><span>公司名称</span><input id="companyManagerName" type="text" placeholder="输入公司名称" required></label>
+            <div class="company-manager-actions">
+              <button class="ghost-button" type="button" id="newCompanyButton">新增公司</button>
+              <button class="primary-button" type="submit">保存</button>
+            </div>
+          </form>
+          <div class="company-manager-list" id="companyManagerList"></div>
+        </section>
+      </div>
+    `);
+    document.getElementById("closeCompanyManager")?.addEventListener("click", closeCompanyManager);
+    document.getElementById("newCompanyButton")?.addEventListener("click", () => editCompany(""));
+    document.getElementById("companyManagerForm")?.addEventListener("submit", saveCompanyForm);
+    document.getElementById("companyManager")?.addEventListener("click", (event) => {
+      if (event.target.id === "companyManager") closeCompanyManager();
+    });
+  }
+
+  function renderCompanyManagerList() {
+    const list = document.getElementById("companyManagerList");
+    if (!list) return;
+    list.innerHTML = companyEntries().map(([key, company]) => `
+      <button class="company-manager-row${key === state.selectedCompany ? " selected" : ""}" type="button" data-edit-company="${escapeHtml(key)}">
+        <span>${escapeHtml(company.name)}</span>
+        <small>${escapeHtml(company.code)} · ${formatMoney(company.funds)}</small>
+        <strong>编辑</strong>
+      </button>
+    `).join("");
+    list.querySelectorAll("[data-edit-company]").forEach((button) => {
+      button.addEventListener("click", () => editCompany(button.dataset.editCompany));
+    });
+  }
+
+  function editCompany(companyKey) {
+    const company = companyData[companyKey];
+    const codeInput = document.getElementById("companyManagerCode");
+    const nameInput = document.getElementById("companyManagerName");
+    if (codeInput) codeInput.value = company?.code || "";
+    if (nameInput) {
+      nameInput.value = company?.name || "";
+      nameInput.focus();
+    }
+  }
+
+  function openCompanyManager() {
+    ensureCompanyManager();
+    renderCompanyManagerList();
+    editCompany(state.selectedCompany);
+    const manager = document.getElementById("companyManager");
+    if (manager) manager.hidden = false;
+  }
+
+  function closeCompanyManager() {
+    const manager = document.getElementById("companyManager");
+    if (manager) manager.hidden = true;
+  }
+
+  async function saveCompanyForm(event) {
+    event.preventDefault();
+    const code = document.getElementById("companyManagerCode")?.value || "";
+    const name = document.getElementById("companyManagerName")?.value.trim() || "";
+    if (!name) return;
+    const result = await postJson("/api/companies", { code, name });
+    replaceCompanyData(result.companies || []);
+    const savedKey = companyCodeToKey[code] || Object.values(companyData).find((company) => company.name === name)?.code || state.selectedCompany;
+    if (companyData[savedKey]) state.selectedCompany = savedKey;
+    renderCompanySurfaces();
+    updateCompany(state.selectedCompany);
+    renderCompanyManagerList();
+    editCompany(state.selectedCompany);
+    await loadPayrollSummary();
+    await loadOverview();
+  }
+
+  async function loadCompanies() {
+    try {
+      const response = await fetch("/api/companies");
+      if (!response.ok) throw new Error("companies unavailable");
+      const data = await response.json();
+      replaceCompanyData(data.companies || []);
+    } catch (error) {
+      companyCodeToKey = buildCompanyCodeToKey();
+    }
+    renderCompanySurfaces();
+    updateCompany(state.selectedCompany);
+  }
+
   function updateCompany(companyKey) {
     const company = companyData[companyKey];
     if (!company) return;
     state.selectedCompany = companyKey;
-    state.selectedAccount = company.bankAccounts[0].id;
+    state.selectedAccount = company.bankAccounts[0]?.id || "";
 
-    document.querySelectorAll("[data-company]").forEach((node) => {
-      node.classList.toggle("selected", node.dataset.company === companyKey);
-    });
-
-    const payrollCompanySelect = document.getElementById("payrollCompanySelect");
-    if (payrollCompanySelect) payrollCompanySelect.value = companyKey;
+    syncCompanySelection();
     if (pendingPayrollImport) {
       pendingPayrollImport = null;
       setPayrollSaveButton(false, "保存");
@@ -1010,12 +1270,12 @@
     });
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     document.querySelectorAll('input[type="month"][data-default-current]').forEach((node) => {
       if (!node.value) node.value = currentPeriod();
     });
     bindEvents();
-    updateCompany(state.selectedCompany);
+    await loadCompanies();
     loadPayrollSummary();
     loadOverview();
   });

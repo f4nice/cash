@@ -320,6 +320,107 @@ def load_overview():
     }
 
 
+def load_companies():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  c.id,
+                  c.company_code,
+                  c.company_name,
+                  COALESCE(opening.total_opening, 0) + COALESCE(txn.net_amount, 0) AS funds
+                FROM companies c
+                LEFT JOIN (
+                  SELECT company_id, SUM(opening_balance) AS total_opening
+                  FROM bank_accounts
+                  WHERE status = 'active'
+                  GROUP BY company_id
+                ) opening ON opening.company_id = c.id
+                LEFT JOIN (
+                  SELECT
+                    company_id,
+                    SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
+                  FROM cash_transactions
+                  GROUP BY company_id
+                ) txn ON txn.company_id = c.id
+                WHERE c.status = 'active'
+                ORDER BY c.id
+                """
+            )
+            company_rows = cur.fetchall()
+            cur.execute(
+                """
+                SELECT
+                  a.id AS account_id,
+                  a.company_id,
+                  a.account_no,
+                  a.bank_name,
+                  a.account_name,
+                  a.opening_balance + COALESCE(txn.net_amount, 0) AS balance
+                FROM bank_accounts a
+                LEFT JOIN (
+                  SELECT
+                    account_id,
+                    SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
+                  FROM cash_transactions
+                  GROUP BY account_id
+                ) txn ON txn.account_id = a.id
+                WHERE a.status = 'active'
+                ORDER BY a.company_id, a.id
+                """
+            )
+            account_rows = cur.fetchall()
+
+    accounts_by_company = {}
+    for row in account_rows:
+        accounts_by_company.setdefault(row["company_id"], []).append(
+            {
+                "id": row["account_no"] or f"account-{row['account_id']}",
+                "bank": row["bank_name"],
+                "accountName": row["account_name"],
+                "balance": row["balance"] or Decimal("0"),
+            }
+        )
+    return {
+        "companies": [
+            {
+                "code": row["company_code"],
+                "name": row["company_name"],
+                "funds": row["funds"] or Decimal("0"),
+                "bankAccounts": accounts_by_company.get(row["id"], []),
+            }
+            for row in company_rows
+        ]
+    }
+
+
+def next_company_code(cur):
+    cur.execute("SELECT COUNT(*) AS total FROM companies")
+    total = int((cur.fetchone() or {}).get("total") or 0) + 1
+    while True:
+        code = f"C{total:03d}"
+        cur.execute("SELECT id FROM companies WHERE company_code = %s", (code,))
+        if not cur.fetchone():
+            return code
+        total += 1
+
+
+def save_company(payload):
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise ApiError(400, "公司名称不能为空")
+    code = str(payload.get("code") or "").strip()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            if not code:
+                code = next_company_code(cur)
+            company = ensure_company(cur, code, name)
+            ensure_account(cur, company["id"], "默认银行", "基本户", f"{code}-default", 0)
+        conn.commit()
+    return load_companies()
+
+
 def load_payroll_summary(period_value):
     period, _, _ = month_bounds(period_value)
     with get_db() as conn:
@@ -703,8 +804,12 @@ class Handler(SimpleHTTPRequestHandler):
             return {"ok": True, "database": os.getenv("MYSQL_DATABASE", "caishenye")}
         if method == "GET" and path == "/api/overview":
             return load_overview()
+        if method == "GET" and path == "/api/companies":
+            return load_companies()
         if method == "GET" and path == "/api/payroll/summary":
             return load_payroll_summary((query.get("period") or [""])[0])
+        if method == "POST" and path == "/api/companies":
+            return save_company(self.read_json())
         if method == "POST" and path == "/api/import/capital":
             return import_capital(self.read_json())
         if method == "POST" and path == "/api/import/payroll":

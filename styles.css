@@ -133,6 +133,14 @@ button {
   margin-top: auto;
 }
 
+.company-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .company-panel h2 {
   margin: 0 0 12px;
   color: var(--muted);
@@ -140,11 +148,30 @@ button {
   font-weight: 700;
 }
 
+.company-panel-title h2 {
+  margin: 0;
+}
+
+.company-manage-button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(15, 143, 122, 0.24);
+  border-radius: 8px;
+  color: var(--teal-dark);
+  background: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.company-list {
+  display: grid;
+  gap: 8px;
+}
+
 .company-row {
   display: grid;
   gap: 4px;
   width: 100%;
-  margin-bottom: 8px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -788,6 +815,100 @@ td {
   font: inherit;
   font-size: 13px;
   font-weight: 800;
+}
+
+.company-manager-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(8, 20, 20, 0.24);
+}
+
+.company-manager-backdrop[hidden] {
+  display: none;
+}
+
+.company-manager-dialog {
+  width: min(520px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 24px 60px rgba(12, 34, 34, 0.2);
+}
+
+.company-manager-form {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.company-manager-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.company-manager-form input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
+}
+
+.company-manager-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.company-manager-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.company-manager-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  text-align: left;
+}
+
+.company-manager-row.selected {
+  border-color: rgba(15, 143, 122, 0.52);
+  background: #eef8f5;
+}
+
+.company-manager-row span {
+  font-weight: 800;
+}
+
+.company-manager-row small {
+  color: var(--muted);
+}
+
+.company-manager-row strong {
+  grid-row: span 2;
+  color: var(--teal-dark);
+  font-size: 13px;
 }
 
 .upload-button-row {
