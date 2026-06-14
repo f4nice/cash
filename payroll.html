@@ -66,6 +66,10 @@
                 <strong>选择工资单Excel</strong>
                 <small id="uploadFileName">未选择文件</small>
               </label>
+              <div class="sheet-control" id="payrollSheetControl" hidden>
+                <label for="payrollSheetSelect"><span>选择Sheet</span><select id="payrollSheetSelect"></select></label>
+                <button class="ghost-button" type="button" data-import-selected-sheet="payroll">读取此Sheet</button>
+              </div>
               <div class="import-summary" aria-live="polite">
                 <div><span>读取员工</span><strong id="importRows">0 人</strong></div>
                 <div><span>人工成本</span><strong id="importCost">¥ 0</strong></div>

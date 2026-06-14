@@ -82,6 +82,33 @@
     selectedAccount: "tech-cmb-basic"
   };
 
+  const selectedUploadFiles = {
+    capital: null,
+    payroll: null,
+    property: null
+  };
+
+  const uploadUi = {
+    capital: {
+      fileNameId: "capitalUploadFileName",
+      statusId: "capitalImportStatus",
+      sheetControlId: "capitalSheetControl",
+      sheetSelectId: "capitalSheetSelect"
+    },
+    payroll: {
+      fileNameId: "uploadFileName",
+      statusId: "importStatus",
+      sheetControlId: "payrollSheetControl",
+      sheetSelectId: "payrollSheetSelect"
+    },
+    property: {
+      fileNameId: "propertyUploadFileName",
+      statusId: "propertyImportStatus",
+      sheetControlId: "propertySheetControl",
+      sheetSelectId: "propertySheetSelect"
+    }
+  };
+
   const payrollFieldAliases = {
     employeeNo: ["员工编号", "工号", "员工号", "employee_no", "employeeNo"],
     name: ["姓名", "员工", "员工姓名", "employee_name", "name"],
@@ -188,19 +215,78 @@
       .map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
   }
 
-  async function readSheetRows(file, statusId) {
-    const ext = file.name.split(".").pop().toLowerCase();
-    if (ext === "csv") return rowsFromCsv(await file.text());
+  function fileExt(file) {
+    return file.name.split(".").pop().toLowerCase();
+  }
 
+  function sheetRows(workbook, sheetName) {
+    const selectedSheetName = sheetName && workbook.Sheets[sheetName] ? sheetName : workbook.SheetNames[0];
+    const sheet = workbook.Sheets[selectedSheetName];
+    return window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+  }
+
+  async function readWorkbook(file, statusId) {
     if (!window.XLSX) {
       setText(statusId, "Excel解析库未加载");
-      return [];
+      return null;
+    }
+    const buffer = await file.arrayBuffer();
+    return window.XLSX.read(buffer, { type: "array" });
+  }
+
+  async function readSheetRows(file, statusId, sheetName) {
+    const ext = fileExt(file);
+    if (ext === "csv") return rowsFromCsv(await file.text());
+
+    const workbook = await readWorkbook(file, statusId);
+    if (!workbook) return [];
+    return sheetRows(workbook, sheetName);
+  }
+
+  function hideSheetControl(kind) {
+    const ui = uploadUi[kind];
+    const control = document.getElementById(ui.sheetControlId);
+    if (control) control.hidden = true;
+  }
+
+  function showSheetControl(kind, sheetNames) {
+    const ui = uploadUi[kind];
+    const control = document.getElementById(ui.sheetControlId);
+    const select = document.getElementById(ui.sheetSelectId);
+    if (!control || !select) return;
+    select.innerHTML = sheetNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+    control.hidden = false;
+  }
+
+  async function prepareUploadFile(kind, file) {
+    const ui = uploadUi[kind];
+    selectedUploadFiles[kind] = file;
+    setText(ui.fileNameId, file.name);
+
+    if (fileExt(file) === "csv") {
+      hideSheetControl(kind);
+      await importSelectedSheet(kind);
+      return;
     }
 
-    const buffer = await file.arrayBuffer();
-    const workbook = window.XLSX.read(buffer, { type: "array" });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    return window.XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: "" });
+    setText(ui.statusId, "读取Sheet列表");
+    const workbook = await readWorkbook(file, ui.statusId);
+    if (!workbook) return;
+    showSheetControl(kind, workbook.SheetNames);
+    setText(ui.statusId, "请选择Sheet后导入");
+  }
+
+  async function importSelectedSheet(kind) {
+    const file = selectedUploadFiles[kind];
+    const ui = uploadUi[kind];
+    if (!file) {
+      setText(ui.statusId, "请先选择Excel文件");
+      return;
+    }
+    const sheetName = document.getElementById(ui.sheetSelectId)?.value || "";
+    if (kind === "payroll") await readPayrollFile(file, sheetName);
+    if (kind === "capital") await readCapitalFile(file, sheetName);
+    if (kind === "property") await readPropertyFile(file, sheetName);
   }
 
   function mapColumns(rows, aliasesMap, headerPattern) {
@@ -585,11 +671,11 @@
     }).join("");
   }
 
-  async function readPayrollFile(file) {
+  async function readPayrollFile(file, sheetName = "") {
     setText("uploadFileName", file.name);
-    setText("importStatus", "读取中");
+    setText("importStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
 
-    const rows = await readSheetRows(file, "importStatus");
+    const rows = await readSheetRows(file, "importStatus", sheetName);
     const payrollRows = mapPayrollRows(rows);
     const total = summarizePayroll(payrollRows);
     const selectedCompany = companyData[state.selectedCompany];
@@ -599,7 +685,7 @@
     setText("importSocialFund", formatMoney(
       total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
     ));
-    setText("importStatus", `${selectedCompany.name} · 已读取`);
+    setText("importStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}`);
     renderPayrollPreview(payrollRows);
 
     try {
@@ -607,6 +693,7 @@
         company: selectedCompanyPayload(),
         period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
         fileName: file.name,
+        sheetName,
         rows: payrollRows
       });
       setText("importStatus", `${selectedCompany.name} · 已写入MySQL ${result.rows} 人`);
@@ -616,11 +703,11 @@
     }
   }
 
-  async function readCapitalFile(file) {
+  async function readCapitalFile(file, sheetName = "") {
     setText("capitalUploadFileName", file.name);
-    setText("capitalImportStatus", "读取中");
+    setText("capitalImportStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
 
-    const rows = await readSheetRows(file, "capitalImportStatus");
+    const rows = await readSheetRows(file, "capitalImportStatus", sheetName);
     const capitalRows = mapCapitalRows(rows);
     const total = summarizeCapital(capitalRows);
     const selectedCompany = companyData[state.selectedCompany];
@@ -629,7 +716,7 @@
     setText("capitalImportIn", formatMoney(total.income));
     setText("capitalImportOut", formatMoney(total.expense));
     setText("capitalImportNet", formatMoney(total.net));
-    setText("capitalImportStatus", `${selectedCompany.name} · 已汇总`);
+    setText("capitalImportStatus", `${selectedCompany.name} · 已汇总${sheetName ? ` ${sheetName}` : ""}`);
     renderCapitalPreview(capitalRows);
     renderCashFlowSummary(capitalRows);
 
@@ -638,6 +725,7 @@
         company: selectedCompanyPayload(),
         account: selectedAccountPayload(),
         fileName: file.name,
+        sheetName,
         rows: capitalRows
       });
       setText("capitalImportStatus", `${selectedCompany.name} · 已写入MySQL ${result.inserted} 笔`);
@@ -647,11 +735,11 @@
     }
   }
 
-  async function readPropertyFile(file) {
+  async function readPropertyFile(file, sheetName = "") {
     setText("propertyUploadFileName", file.name);
-    setText("propertyImportStatus", "读取中");
+    setText("propertyImportStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
 
-    const rows = await readSheetRows(file, "propertyImportStatus");
+    const rows = await readSheetRows(file, "propertyImportStatus", sheetName);
     const propertyRows = mapPropertyRows(rows);
     const total = summarizeProperty(propertyRows);
     const selectedCompany = companyData[state.selectedCompany];
@@ -662,7 +750,7 @@
 
     setText("propertyImportRows", `${total.rows} 项`);
     setText("propertyImportCost", formatMoney(total.amount));
-    setText("propertyImportStatus", `${selectedCompany.name} · 已读取`);
+    setText("propertyImportStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}`);
     renderPropertyStats();
 
     try {
@@ -670,6 +758,7 @@
         company: selectedCompanyPayload(),
         period: document.getElementById("propertyPeriod")?.value || currentPeriod(),
         fileName: file.name,
+        sheetName,
         rows: propertyRows
       });
       setText("propertyImportStatus", `${selectedCompany.name} · 已写入MySQL ${result.inserted} 项`);
@@ -795,17 +884,21 @@
 
     document.getElementById("payrollFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
-      if (file) readPayrollFile(file);
+      if (file) prepareUploadFile("payroll", file);
     });
 
     document.getElementById("capitalFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
-      if (file) readCapitalFile(file);
+      if (file) prepareUploadFile("capital", file);
     });
 
     document.getElementById("propertyFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
-      if (file) readPropertyFile(file);
+      if (file) prepareUploadFile("property", file);
+    });
+
+    document.querySelectorAll("[data-import-selected-sheet]").forEach((node) => {
+      node.addEventListener("click", () => importSelectedSheet(node.dataset.importSelectedSheet));
     });
 
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);

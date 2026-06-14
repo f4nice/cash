@@ -40,6 +40,8 @@ python server.py
 - `POST /api/import/property`：写入 `property_expenses`，并同步生成物业相关支出流水。
 - `GET /api/overview`：首页读取今日收入、今日支出和各公司净现金流。
 
+Excel 上传时会先读取工作簿里的 Sheet 名称，页面选择具体 Sheet 后再读取并写入 MySQL；CSV 没有 Sheet，会直接导入。
+
 ## 导入方式
 
 ```powershell

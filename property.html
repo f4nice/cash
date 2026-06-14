@@ -66,6 +66,10 @@
                 <strong>选择物业费用Excel</strong>
                 <small id="propertyUploadFileName">未选择文件</small>
               </label>
+              <div class="sheet-control" id="propertySheetControl" hidden>
+                <label for="propertySheetSelect"><span>选择Sheet</span><select id="propertySheetSelect"></select></label>
+                <button class="ghost-button" type="button" data-import-selected-sheet="property">读取此Sheet</button>
+              </div>
               <div class="import-summary" aria-live="polite">
                 <div><span>读取项目</span><strong id="propertyImportRows">0 项</strong></div>
                 <div><span>费用合计</span><strong id="propertyImportCost">¥ 0</strong></div>

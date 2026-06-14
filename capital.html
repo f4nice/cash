@@ -83,6 +83,10 @@
                 <strong>选择银行流水或资金表</strong>
                 <small id="capitalUploadFileName">未选择文件</small>
               </label>
+              <div class="sheet-control" id="capitalSheetControl" hidden>
+                <label for="capitalSheetSelect"><span>选择Sheet</span><select id="capitalSheetSelect"></select></label>
+                <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
+              </div>
               <div class="import-summary capital-import-summary" aria-live="polite">
                 <div><span>读取流水</span><strong id="capitalImportRows">0 笔</strong></div>
                 <div><span>流入</span><strong id="capitalImportIn">¥ 0</strong></div>
