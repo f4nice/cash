@@ -104,6 +104,7 @@
   let selectedPayrollRowIndexes = new Set();
   let selectedSalaryBatchIds = new Set();
   let latestPayrollSummary = null;
+  let latestProfitSummary = null;
 
   const uploadUi = {
     capital: {
@@ -191,6 +192,13 @@
     const amount = Number(value) || 0;
     const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
     return `${prefix}${formatMoney(Math.abs(amount))}`;
+  }
+
+  function formatPercent(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "-";
+    return `${number.toFixed(2)}%`;
   }
 
   function parseAmount(value) {
@@ -1110,6 +1118,15 @@
     select.value = state.selectedCompany;
   }
 
+  function renderProfitCompanyOptions() {
+    const select = document.getElementById("profitCompanySelect");
+    if (!select) return;
+    select.innerHTML = companyEntries().map(([key, company]) => (
+      `<option value="${escapeHtml(key)}">${escapeHtml(company.name)}</option>`
+    )).join("");
+    select.value = state.selectedCompany;
+  }
+
   function renderBaseCompanyCards() {
     const payrollGrid = document.querySelector(".payroll-company-grid");
     if (payrollGrid) {
@@ -1151,7 +1168,7 @@
       }).join("");
     }
 
-    document.querySelectorAll(".payroll-company-grid [data-company], .capital-company-grid [data-company], .property-company-grid [data-company]").forEach((button) => {
+    document.querySelectorAll(".payroll-company-grid [data-company], .capital-company-grid [data-company], .property-company-grid [data-company], .profit-company-grid [data-company]").forEach((button) => {
       button.addEventListener("click", () => updateCompany(button.dataset.company));
     });
   }
@@ -1167,6 +1184,7 @@
   function renderCompanySurfaces() {
     renderSidebarCompanies();
     renderPayrollCompanyOptions();
+    renderProfitCompanyOptions();
     renderBaseCompanyCards();
     renderCapitalTotals();
   }
@@ -1177,6 +1195,8 @@
     });
     const payrollCompanySelect = document.getElementById("payrollCompanySelect");
     if (payrollCompanySelect) payrollCompanySelect.value = state.selectedCompany;
+    const profitCompanySelect = document.getElementById("profitCompanySelect");
+    if (profitCompanySelect) profitCompanySelect.value = state.selectedCompany;
   }
 
   function ensureCompanyManager() {
@@ -1354,6 +1374,7 @@
     setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
     renderBankAccounts();
     renderPropertyStats();
+    renderSelectedProfitCompany();
     renderSelectedPayrollMetrics();
   }
 
@@ -1627,6 +1648,154 @@
       groups[item.type] = (groups[item.type] || 0) + item.amount;
       return groups;
     }, {});
+  }
+
+  function selectedProfitPeriod() {
+    return document.getElementById("profitPeriod")?.value || currentPeriod();
+  }
+
+  function profitCompanyRows() {
+    const rows = latestProfitSummary?.companies || [];
+    if (rows.length) return rows;
+    return companyEntries().map(([, company]) => ({
+      code: company.code,
+      name: company.name,
+      revenue: 0,
+      expense: 0,
+      netProfit: 0,
+      margin: null,
+      remark: ""
+    }));
+  }
+
+  function selectedProfitRow() {
+    const company = companyData[state.selectedCompany];
+    return profitCompanyRows().find((item) => item.code === company?.code) || null;
+  }
+
+  function renderSelectedProfitCompany() {
+    const company = companyData[state.selectedCompany];
+    if (!company) return;
+    setText("selectedProfitCompanyBadge", company.name);
+    setText("profitEntryCompanyBadge", `当前公司：${company.name}`);
+    const select = document.getElementById("profitCompanySelect");
+    if (select) select.value = state.selectedCompany;
+    document.querySelectorAll(".profit-company-grid [data-company]").forEach((node) => {
+      node.classList.toggle("selected", node.dataset.company === state.selectedCompany);
+    });
+    const row = selectedProfitRow();
+    const revenueInput = document.getElementById("profitRevenue");
+    const costInput = document.getElementById("profitCost");
+    const netInput = document.getElementById("profitNet");
+    const remarkInput = document.getElementById("profitRemark");
+    if (row && document.activeElement !== revenueInput && document.activeElement !== costInput && document.activeElement !== netInput) {
+      if (revenueInput) revenueInput.value = Number(row.revenue || 0) || "";
+      if (costInput) costInput.value = Number(row.expense || 0) || "";
+      if (netInput) netInput.value = Number(row.netProfit || 0) || "";
+      if (remarkInput) remarkInput.value = row.remark || "";
+    }
+  }
+
+  function renderProfitSummary(data) {
+    latestProfitSummary = data || { companies: [] };
+    const companies = profitCompanyRows();
+    setText("profitTotalNet", formatMoney(data?.netProfit || 0));
+    setText("profitPositiveCount", `${data?.positiveCompanyCount || 0} 家`);
+    setText("profitTotalRevenue", formatMoney(data?.revenue || 0));
+    setText("profitTotalExpense", formatMoney(data?.expense || 0));
+
+    const grid = document.getElementById("profitCompanyGrid");
+    if (grid) {
+      grid.innerHTML = companies.map((item) => {
+        const key = companyCodeToKey[item.code] || item.code;
+        const net = Number(item.netProfit || 0);
+        const status = net > 0 ? "盈利" : (net < 0 ? "亏损" : "平稳");
+        const statusClassName = net > 0 ? "good" : (net < 0 ? "loss" : "steady");
+        return `
+          <button class="profit-company-card ${statusClassName}${key === state.selectedCompany ? " selected" : ""}" type="button" data-company="${escapeHtml(key)}">
+            <span>${escapeHtml(item.name)}</span>
+            <strong>${status} ${formatMoney(net)}</strong>
+            <small>收入 ${formatMoney(item.revenue)} · 成本 ${formatMoney(item.expense)}</small>
+          </button>
+        `;
+      }).join("");
+      grid.querySelectorAll("[data-company]").forEach((button) => {
+        button.addEventListener("click", () => updateCompany(button.dataset.company));
+      });
+    }
+
+    const tbody = document.getElementById("profitCompanyBody");
+    if (tbody) {
+      tbody.innerHTML = companies.map((item) => {
+        const net = Number(item.netProfit || 0);
+        return `
+          <tr class="${item.code === companyData[state.selectedCompany]?.code ? "selected-row" : ""}">
+            <td>${escapeHtml(item.name)}</td>
+            <td>${formatMoney(item.revenue)}</td>
+            <td>${formatMoney(item.expense)}</td>
+            <td class="${net >= 0 ? "positive" : "negative"}">${formatMoney(net)}</td>
+            <td>${formatPercent(item.margin)}</td>
+            <td>${escapeHtml(item.remark || "-")}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+    renderSelectedProfitCompany();
+  }
+
+  async function loadProfitSummary() {
+    if (!document.getElementById("profit")) return;
+    try {
+      const response = await fetch(`/api/profit/summary?period=${encodeURIComponent(selectedProfitPeriod())}`);
+      if (!response.ok) throw new Error("profit summary unavailable");
+      renderProfitSummary(await response.json());
+    } catch (error) {
+      renderProfitSummary({ companies: [] });
+    }
+  }
+
+  async function saveProfitMonthly(event) {
+    event.preventDefault();
+    const company = companyData[state.selectedCompany];
+    if (!company) return;
+    const revenueValue = document.getElementById("profitRevenue")?.value || "";
+    const costValue = document.getElementById("profitCost")?.value || "";
+    const netValue = document.getElementById("profitNet")?.value || "";
+    if (!revenueValue && !costValue && !netValue) {
+      setText("profitEntryStatus", "请至少填写本月利润");
+      return;
+    }
+    const button = document.querySelector("#profitEntryForm button[type='submit']");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "保存中";
+    }
+    try {
+      const result = await postJson("/api/profit/monthly", {
+        company: selectedCompanyPayload(),
+        period: selectedProfitPeriod(),
+        revenue: revenueValue,
+        cost: costValue,
+        netProfit: netValue,
+        remark: document.getElementById("profitRemark")?.value || ""
+      });
+      setText("profitEntryStatus", `${company.name} · ${selectedProfitPeriod()} 利润已保存`);
+      renderProfitSummary(result);
+      await loadOverview();
+    } catch (error) {
+      setText("profitEntryStatus", error.message || "利润保存失败");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "保存利润";
+      }
+    }
+  }
+
+  function setProfitPeriod(period) {
+    const input = document.getElementById("profitPeriod");
+    if (input) input.value = period;
+    loadProfitSummary();
   }
 
   function selectedPropertyPeriod() {
@@ -2479,6 +2648,10 @@
       updateCompany(event.target.value);
     });
 
+    document.getElementById("profitCompanySelect")?.addEventListener("change", (event) => {
+      updateCompany(event.target.value);
+    });
+
     document.getElementById("capitalAsOfDate")?.addEventListener("change", handleCapitalDateChange);
     document.getElementById("capitalLatestDate")?.addEventListener("click", showLatestCapitalDate);
 
@@ -2546,6 +2719,15 @@
       if (dateInput) dateInput.value = propertyPeriodStartDate();
       loadPropertySummary();
     });
+
+    document.getElementById("profitPeriod")?.addEventListener("change", loadProfitSummary);
+    document.getElementById("profitPrevMonth")?.addEventListener("click", () => {
+      setProfitPeriod(shiftPeriod(selectedProfitPeriod(), -1));
+    });
+    document.getElementById("profitNextMonth")?.addEventListener("click", () => {
+      setProfitPeriod(shiftPeriod(selectedProfitPeriod(), 1));
+    });
+    document.getElementById("profitEntryForm")?.addEventListener("submit", saveProfitMonthly);
 
     document.getElementById("payrollPeriod")?.addEventListener("change", handlePayrollPeriodChange);
     document.getElementById("payrollPrevMonth")?.addEventListener("click", () => {
@@ -2621,6 +2803,7 @@
     await loadCompanies();
     setPropertyExpenseType(document.getElementById("propertyExpenseType")?.value || "房租");
     await loadPropertySummary();
+    await loadProfitSummary();
     loadPayrollSummary();
     loadOverview();
   });

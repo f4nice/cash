@@ -616,6 +616,113 @@ def delete_company(payload):
     return load_companies()
 
 
+def profit_payload_from_row(row):
+    revenue = row.get("revenue") or Decimal("0")
+    net_profit = row.get("net_profit") or Decimal("0")
+    expense = revenue - net_profit
+    margin = None
+    if revenue:
+        margin = (net_profit / revenue * Decimal("100")).quantize(Decimal("0.01"))
+    return {
+        "code": row["company_code"],
+        "name": row["company_name"],
+        "revenue": revenue,
+        "expense": expense,
+        "netProfit": net_profit,
+        "margin": margin,
+        "remark": row.get("remark") or "",
+        "updatedAt": row.get("updated_at"),
+    }
+
+
+def load_profit_summary(period_value):
+    period, _, _ = month_bounds(period_value)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  COALESCE(p.revenue, 0) AS revenue,
+                  COALESCE(p.net_profit, 0) AS net_profit,
+                  p.remark,
+                  p.updated_at
+                FROM companies c
+                LEFT JOIN profit_monthly p
+                  ON p.company_id = c.id AND p.period_month = %s
+                WHERE c.status = 'active'
+                ORDER BY c.id
+                """,
+                (period,),
+            )
+            rows = cur.fetchall()
+    companies = [profit_payload_from_row(row) for row in rows]
+    total_revenue = sum((item["revenue"] for item in companies), Decimal("0"))
+    total_net = sum((item["netProfit"] for item in companies), Decimal("0"))
+    total_expense = sum((item["expense"] for item in companies), Decimal("0"))
+    positive_count = sum(1 for item in companies if item["netProfit"] > 0)
+    return {
+        "period": period,
+        "revenue": total_revenue,
+        "expense": total_expense,
+        "netProfit": total_net,
+        "positiveCompanyCount": positive_count,
+        "companies": companies,
+    }
+
+
+def save_profit_monthly(payload):
+    company_payload = payload.get("company") or {}
+    period, _, _ = month_bounds(payload.get("period"))
+    has_revenue = str(payload.get("revenue") or "").strip() != ""
+    has_cost = str(payload.get("cost") or "").strip() != ""
+    has_net = str(payload.get("netProfit") or "").strip() != ""
+    revenue = parse_amount(payload.get("revenue"))
+    cost = parse_amount(payload.get("cost"))
+    net_profit = parse_amount(payload.get("netProfit"))
+    if not has_revenue and not has_cost and has_net:
+        if net_profit >= 0:
+            revenue = net_profit
+            cost = Decimal("0")
+        else:
+            revenue = Decimal("0")
+            cost = abs(net_profit)
+    elif has_revenue and not has_cost and has_net:
+        cost = revenue - net_profit
+    elif not has_revenue and has_cost and has_net:
+        revenue = cost + net_profit
+    elif not has_revenue and not has_cost and not has_net:
+        raise ApiError(400, "请填写本月利润")
+    remark = str(payload.get("remark") or "").strip() or None
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = find_company(cur, company_payload.get("code"), company_payload.get("name"))
+            cur.execute(
+                """
+                INSERT INTO profit_monthly (
+                  company_id, period_month, revenue, cost,
+                  selling_expense, admin_expense, finance_expense, tax_expense,
+                  other_income, other_expense, remark
+                )
+                VALUES (%s, %s, %s, %s, 0, 0, 0, 0, 0, 0, %s)
+                ON DUPLICATE KEY UPDATE
+                  revenue = VALUES(revenue),
+                  cost = VALUES(cost),
+                  selling_expense = 0,
+                  admin_expense = 0,
+                  finance_expense = 0,
+                  tax_expense = 0,
+                  other_income = 0,
+                  other_expense = 0,
+                  remark = VALUES(remark)
+                """,
+                (company["id"], period, revenue, cost, remark),
+            )
+        conn.commit()
+    return load_profit_summary(period)
+
+
 def load_payroll_summary(period_value):
     period, _, _ = month_bounds(period_value)
     with get_db() as conn:
@@ -1605,6 +1712,8 @@ class Handler(SimpleHTTPRequestHandler):
             return load_companies((query.get("asOf") or [""])[0])
         if method == "GET" and path == "/api/payroll/summary":
             return load_payroll_summary((query.get("period") or [""])[0])
+        if method == "GET" and path == "/api/profit/summary":
+            return load_profit_summary((query.get("period") or [""])[0])
         if method == "GET" and path == "/api/payroll/salary-details":
             return load_payroll_salary_details((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "GET" and path == "/api/payroll/employees":
@@ -1628,6 +1737,8 @@ class Handler(SimpleHTTPRequestHandler):
             return delete_capital_account_records(self.read_json())
         if method == "POST" and path == "/api/import/payroll":
             return import_payroll(self.read_json())
+        if method == "POST" and path == "/api/profit/monthly":
+            return save_profit_monthly(self.read_json())
         if method == "POST" and path == "/api/payroll/delete-batches":
             return delete_payroll_batches(self.read_json())
         if method == "POST" and path == "/api/import/property":

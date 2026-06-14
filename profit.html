@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>利润表 - 财神爷</title>
+  <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="公司导航">
+      <div class="brand"><div class="brand-mark" aria-hidden="true"><img src="assets/logo-caishenye.svg" alt=""></div><div><strong>财神爷</strong><span>多公司财务管理</span></div></div>
+      <nav class="nav-list" aria-label="主导航">
+        <a class="nav-item" href="index.html"><span class="nav-icon">01</span><span>总览</span></a>
+        <a class="nav-item" href="capital.html"><span class="nav-icon">02</span><span>资金表</span></a>
+        <a class="nav-item active" href="profit.html"><span class="nav-icon">03</span><span>利润表</span></a>
+        <a class="nav-item" href="payroll.html"><span class="nav-icon">04</span><span>工资社保</span></a>
+        <a class="nav-item" href="property.html"><span class="nav-icon">05</span><span>物业费用</span></a>
+      </nav>
+      <section class="company-panel" aria-labelledby="company-title-profit">
+        <h2 id="company-title-profit">公司</h2>
+        <button class="company-row selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 1,284,600</strong></button>
+        <button class="company-row" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 684,200</strong></button>
+        <button class="company-row" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,108,900</strong></button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">利润数据维护</p><h1>利润表</h1></div>
+      </header>
+
+      <section class="content-grid">
+        <section class="panel span-12 profit-workspace" id="profit" aria-labelledby="profit-title">
+          <div class="panel-header">
+            <div><p class="eyebrow">利润表</p><h2 id="profit-title">月度利润表工作台</h2></div>
+            <div class="profit-period-switcher">
+              <button class="ghost-button period-step-button" type="button" id="profitPrevMonth">上月</button>
+              <label class="period-control profit-period-control">
+                <span>所属月份</span>
+                <input id="profitPeriod" type="month" value="2026-06" data-default-current>
+              </label>
+              <button class="ghost-button period-step-button" type="button" id="profitNextMonth">下月</button>
+            </div>
+          </div>
+
+          <div class="profit-overview" aria-label="利润总览">
+            <article><span>当月净利润</span><strong id="profitTotalNet">¥ 0</strong></article>
+            <article><span>盈利公司</span><strong id="profitPositiveCount">0 家</strong></article>
+            <article><span>收入合计</span><strong id="profitTotalRevenue">¥ 0</strong></article>
+            <article><span>成本费用</span><strong id="profitTotalExpense">¥ 0</strong></article>
+          </div>
+
+          <div class="profit-layout">
+            <section class="profit-company-panel" aria-labelledby="profit-company-title">
+              <div class="section-title-row">
+                <div><p class="eyebrow">公司利润</p><h3 id="profit-company-title">选择公司查看利润</h3></div>
+                <span id="selectedProfitCompanyBadge">示例科技</span>
+              </div>
+              <div class="profit-company-grid" id="profitCompanyGrid">
+                <button class="profit-company-card selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 0</strong><small>收入 ¥ 0 · 成本 ¥ 0</small></button>
+              </div>
+            </section>
+
+            <section class="profit-entry-panel" aria-labelledby="profit-entry-title">
+              <div class="section-title-row">
+                <div><p class="eyebrow">月度录入</p><h3 id="profit-entry-title">添加每月利润</h3></div>
+                <span id="profitEntryCompanyBadge">当前公司：示例科技</span>
+              </div>
+              <form class="profit-entry-form" id="profitEntryForm">
+                <label><span>录入公司</span><select id="profitCompanySelect"></select></label>
+                <label><span>收入</span><input id="profitRevenue" type="number" step="0.01" placeholder="可选"></label>
+                <label><span>成本/支出</span><input id="profitCost" type="number" step="0.01" placeholder="可选"></label>
+                <label><span>本月利润</span><input id="profitNet" type="number" step="0.01" placeholder="可直接填利润"></label>
+                <label class="profit-remark-field"><span>备注</span><input id="profitRemark" type="text" placeholder="例如：6月利润录入"></label>
+                <button class="primary-button" type="submit">保存利润</button>
+              </form>
+              <div class="profit-entry-status" id="profitEntryStatus">同一公司同一月份会自动覆盖旧记录</div>
+            </section>
+          </div>
+
+          <section class="profit-table-panel" aria-labelledby="profit-table-title">
+            <div class="section-title-row compact"><div><p class="eyebrow">利润明细</p><h3 id="profit-table-title">各公司月度利润</h3></div></div>
+            <div class="table-wrap profit-table-wrap">
+              <table>
+                <thead><tr><th>公司</th><th>收入</th><th>成本费用</th><th>净利润</th><th>利润率</th><th>备注</th></tr></thead>
+                <tbody id="profitCompanyBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

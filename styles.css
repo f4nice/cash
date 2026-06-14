@@ -769,6 +769,7 @@ td {
 }
 
 .capital-overview,
+.profit-overview,
 .payroll-overview {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -777,6 +778,7 @@ td {
 }
 
 .capital-overview article,
+.profit-overview article,
 .payroll-overview article,
 .payroll-overview-card {
   display: grid;
@@ -802,6 +804,7 @@ td {
 }
 
 .capital-overview span,
+.profit-overview span,
 .payroll-overview span,
 .section-title-row span,
 .upload-zone small,
@@ -810,12 +813,14 @@ td {
 }
 
 .capital-overview strong,
+.profit-overview strong,
 .payroll-overview strong,
 .payroll-overview-card strong {
   font-size: 23px;
 }
 
 .capital-layout,
+.profit-layout,
 .payroll-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.75fr);
@@ -825,6 +830,119 @@ td {
 
 .capital-workspace .capital-layout {
   grid-template-columns: 1fr;
+}
+
+.profit-period-switcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.profit-period-control {
+  min-width: 168px;
+  margin-bottom: 0;
+}
+
+.profit-company-panel,
+.profit-entry-panel,
+.profit-table-panel {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(247, 250, 249, 0.76);
+}
+
+.profit-company-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profit-company-card {
+  display: grid;
+  gap: 7px;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  text-align: left;
+}
+
+.profit-company-card.selected {
+  border-color: rgba(15, 143, 122, 0.58);
+  background: #eef8f5;
+  box-shadow: inset 0 0 0 1px rgba(15, 143, 122, 0.16);
+}
+
+.profit-company-card.good {
+  border-color: rgba(15, 143, 122, 0.28);
+}
+
+.profit-company-card.loss {
+  border-color: rgba(201, 93, 77, 0.30);
+}
+
+.profit-company-card span,
+.profit-company-card small {
+  color: var(--muted);
+}
+
+.profit-company-card strong {
+  font-size: 21px;
+}
+
+.profit-entry-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profit-entry-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profit-entry-form input,
+.profit-entry-form select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
+}
+
+.profit-remark-field,
+.profit-entry-form button {
+  grid-column: 1 / -1;
+}
+
+.profit-entry-status {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profit-table-panel {
+  margin-top: 16px;
+}
+
+.profit-table-wrap table {
+  min-width: 860px;
 }
 
 .capital-import-bar {
@@ -1920,7 +2038,8 @@ td {
     grid-column: span 12;
   }
 
-  .payroll-layout {
+  .payroll-layout,
+  .profit-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1944,12 +2063,14 @@ td {
   }
 
   .payroll-period-switcher,
+  .profit-period-switcher,
   .salary-dialog-actions,
   .dialog-actions {
     justify-content: stretch;
   }
 
-  .payroll-period-control {
+  .payroll-period-control,
+  .profit-period-control {
     flex: 1;
   }
 
@@ -2015,12 +2136,15 @@ td {
   }
 
   .capital-overview,
+  .profit-overview,
   .property-overview,
   .payroll-overview,
   .capital-company-grid,
+  .profit-company-grid,
   .property-company-grid,
   .property-item-actions,
   .property-expense-form,
+  .profit-entry-form,
   .property-category-list,
   .payroll-company-grid,
   .bank-account-list,
@@ -2036,6 +2160,7 @@ td {
   }
 
   .capital-layout,
+  .profit-layout,
   .property-layout,
   .payroll-layout {
     grid-template-columns: 1fr;
