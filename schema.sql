@@ -276,8 +276,7 @@ CREATE TABLE intercompany_flows (
     FOREIGN KEY (to_account_id) REFERENCES bank_accounts(id)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
-  CONSTRAINT ck_intercompany_amount_positive CHECK (amount > 0),
-  CONSTRAINT ck_intercompany_different_company CHECK (from_company_id <> to_company_id)
+  CONSTRAINT ck_intercompany_amount_positive CHECK (amount > 0)
 ) ENGINE=InnoDB;
 
 CREATE OR REPLACE VIEW v_company_cash_balance AS
