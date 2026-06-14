@@ -594,6 +594,28 @@ def save_company(payload):
     return load_companies()
 
 
+def delete_company(payload):
+    code = str(payload.get("code") or "").strip()
+    if not code:
+        raise ApiError(400, "公司编号不能为空")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = fetch_one(
+                cur,
+                "SELECT id, company_name FROM companies WHERE company_code = %s AND status = 'active' LIMIT 1",
+                (code,),
+            )
+            if not company:
+                raise ApiError(404, "公司不存在或已删除")
+            cur.execute("SELECT COUNT(*) AS total FROM companies WHERE status = 'active'")
+            active_total = int((cur.fetchone() or {}).get("total") or 0)
+            if active_total <= 1:
+                raise ApiError(400, "至少需要保留一家公司")
+            cur.execute("UPDATE companies SET status = 'inactive' WHERE id = %s", (company["id"],))
+        conn.commit()
+    return load_companies()
+
+
 def load_payroll_summary(period_value):
     period, _, _ = month_bounds(period_value)
     with get_db() as conn:
@@ -1396,6 +1418,8 @@ class Handler(SimpleHTTPRequestHandler):
             return load_payroll_employees((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "POST" and path == "/api/companies":
             return save_company(self.read_json())
+        if method == "POST" and path == "/api/companies/delete":
+            return delete_company(self.read_json())
         if method == "POST" and path == "/api/import/capital":
             return import_capital(self.read_json())
         if method == "POST" and path == "/api/capital/delete-account-records":

@@ -1206,14 +1206,22 @@
     const list = document.getElementById("companyManagerList");
     if (!list) return;
     list.innerHTML = companyEntries().map(([key, company]) => `
-      <button class="company-manager-row${key === state.selectedCompany ? " selected" : ""}" type="button" data-edit-company="${escapeHtml(key)}">
-        <span>${escapeHtml(company.name)}</span>
-        <small>${escapeHtml(company.code)} · ${formatMoney(company.funds)}</small>
-        <strong>编辑</strong>
-      </button>
+      <div class="company-manager-row${key === state.selectedCompany ? " selected" : ""}">
+        <div class="company-manager-row-main">
+          <span>${escapeHtml(company.name)}</span>
+          <small>${escapeHtml(company.code)} · ${formatMoney(company.funds)}</small>
+        </div>
+        <div class="company-manager-row-actions">
+          <button class="ghost-button" type="button" data-edit-company="${escapeHtml(key)}">编辑</button>
+          <button class="ghost-button danger-button" type="button" data-delete-company="${escapeHtml(key)}">删除</button>
+        </div>
+      </div>
     `).join("");
     list.querySelectorAll("[data-edit-company]").forEach((button) => {
       button.addEventListener("click", () => editCompany(button.dataset.editCompany));
+    });
+    list.querySelectorAll("[data-delete-company]").forEach((button) => {
+      button.addEventListener("click", () => deleteCompany(button.dataset.deleteCompany));
     });
   }
 
@@ -1256,6 +1264,33 @@
     editCompany(state.selectedCompany);
     await loadPayrollSummary();
     await loadOverview();
+  }
+
+  async function deleteCompany(companyKey) {
+    const company = companyData[companyKey];
+    if (!company) return;
+    const confirmed = window.confirm(`确认删除公司「${company.name}」吗？删除后页面不再显示，历史数据仍保留在 MySQL。`);
+    if (!confirmed) return;
+
+    const buttons = document.querySelectorAll("[data-delete-company]");
+    buttons.forEach((button) => {
+      button.disabled = true;
+    });
+    try {
+      const result = await postJson("/api/companies/delete", { code: company.code });
+      replaceCompanyData(result.companies || []);
+      renderCompanySurfaces();
+      updateCompany(state.selectedCompany);
+      renderCompanyManagerList();
+      editCompany(state.selectedCompany);
+      await loadPayrollSummary();
+      await loadOverview();
+    } catch (error) {
+      window.alert(error.message || "删除公司失败");
+      buttons.forEach((button) => {
+        button.disabled = false;
+      });
+    }
   }
 
   async function loadCompanies() {

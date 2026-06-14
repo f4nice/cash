@@ -1024,7 +1024,6 @@ td {
   border-radius: 8px;
   color: var(--ink);
   background: white;
-  text-align: left;
 }
 
 .company-manager-row.selected {
@@ -1032,18 +1031,29 @@ td {
   background: #eef8f5;
 }
 
-.company-manager-row span {
+.company-manager-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.company-manager-row-main span {
   font-weight: 800;
 }
 
-.company-manager-row small {
+.company-manager-row-main small {
   color: var(--muted);
 }
 
-.company-manager-row strong {
-  grid-row: span 2;
-  color: var(--teal-dark);
-  font-size: 13px;
+.company-manager-row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.company-manager-row-actions button {
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .employee-dialog-backdrop {
