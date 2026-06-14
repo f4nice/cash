@@ -288,12 +288,26 @@
     return `明细归属：${company.name} / ${account.bank} ${account.accountName}`;
   }
 
+  function toCapitalMonth(value) {
+    const text = String(value || "").trim();
+    const match = text.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+    return match ? `${match[1]}-${match[2]}` : "";
+  }
+
+  function capitalMonthToAsOf(value) {
+    const month = toCapitalMonth(value);
+    if (!month) return "";
+    const [year, monthNumber] = month.split("-").map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    return `${year}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  }
+
   function selectedCapitalDate() {
-    return document.getElementById("capitalAsOfDate")?.value || state.capitalAsOfDate || "";
+    return capitalMonthToAsOf(document.getElementById("capitalAsOfDate")?.value || state.capitalAsOfDate || "");
   }
 
   function setCapitalDateValue(value) {
-    state.capitalAsOfDate = value || "";
+    state.capitalAsOfDate = toCapitalMonth(value);
     const input = document.getElementById("capitalAsOfDate");
     if (input && input.value !== state.capitalAsOfDate) input.value = state.capitalAsOfDate;
   }
