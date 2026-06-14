@@ -158,17 +158,27 @@ def fetch_one(cur, sql, args):
     return cur.fetchone()
 
 
-def ensure_company(cur, code, name):
+def ensure_company(cur, code, name, update_name=True):
     code = str(code or "").strip() or "A001"
     name = str(name or code).strip()
-    cur.execute(
-        """
-        INSERT INTO companies (company_code, company_name, remark)
-        VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active'
-        """,
-        (code, name, "系统自动创建"),
-    )
+    if update_name:
+        cur.execute(
+            """
+            INSERT INTO companies (company_code, company_name, remark)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active'
+            """,
+            (code, name, "系统自动创建"),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO companies (company_code, company_name, remark)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE status = 'active'
+            """,
+            (code, name, "系统初始化创建"),
+        )
     row = fetch_one(cur, "SELECT id, company_code, company_name FROM companies WHERE company_code = %s", (code,))
     if not row:
         raise ApiError(500, f"公司不存在：{code}")
@@ -249,7 +259,7 @@ def ensure_seed_data():
     with conn:
         with conn.cursor() as cur:
             for seed in SEED_COMPANIES:
-                company = ensure_company(cur, seed["code"], seed["name"])
+                company = ensure_company(cur, seed["code"], seed["name"], update_name=False)
                 for key, bank, account, account_type, balance in seed["accounts"]:
                     account_row = ensure_account(cur, company["id"], bank, account, key, balance)
                     cur.execute(
