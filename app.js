@@ -1,6 +1,7 @@
 (function () {
   const companyData = {
     tech: {
+      code: "A001",
       name: "示例科技",
       funds: 1284600,
       bankAccounts: [
@@ -26,6 +27,7 @@
       ]
     },
     trade: {
+      code: "A002",
       name: "示例贸易",
       funds: 684200,
       bankAccounts: [
@@ -50,6 +52,7 @@
       ]
     },
     holding: {
+      code: "A003",
       name: "控股主体",
       funds: 2108900,
       bankAccounts: [
@@ -80,6 +83,7 @@
   };
 
   const payrollFieldAliases = {
+    employeeNo: ["员工编号", "工号", "员工号", "employee_no", "employeeNo"],
     name: ["姓名", "员工", "员工姓名", "employee_name", "name"],
     gross: ["应发工资", "应发", "税前工资", "gross_salary", "gross"],
     net: ["实发工资", "实发", "到手工资", "net_salary", "net"],
@@ -103,6 +107,15 @@
     balance: ["余额", "账户余额", "balance"]
   };
 
+  const propertyFieldAliases = {
+    period: ["月份", "期间", "账期", "费用月份", "period", "month"],
+    date: ["日期", "费用日期", "付款日期", "date", "expense_date"],
+    property: ["物业所属", "物业", "房屋", "地点", "property", "property_name"],
+    type: ["费用类型", "类型", "费用项目", "category", "type", "expense_type"],
+    vendor: ["收款方", "供应商", "物业公司", "vendor", "vendor_name"],
+    amount: ["金额", "费用", "amount"]
+  };
+
   function formatMoney(value) {
     const amount = Math.round(Number(value) || 0).toLocaleString("zh-CN");
     return `¥ ${amount}`;
@@ -114,6 +127,42 @@
     const normalized = String(value).replace(/,/g, "").replace(/[^\d.-]/g, "");
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function currentPeriod() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function selectedCompanyPayload() {
+    const company = companyData[state.selectedCompany];
+    return {
+      key: state.selectedCompany,
+      code: company.code,
+      name: company.name
+    };
+  }
+
+  function selectedAccountPayload() {
+    const account = getSelectedAccount();
+    return {
+      key: account.id,
+      bank: account.bank,
+      accountName: account.accountName
+    };
+  }
+
+  async function postJson(url, payload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || "写入失败");
+    }
+    return data;
   }
 
   function normalizeHeader(value) {
@@ -178,6 +227,7 @@
       const employerSocial = getMoney("employerSocial");
 
       return {
+        employeeNo: getText("employeeNo"),
         name: getText("name"),
         gross,
         net: getMoney("net"),
@@ -227,6 +277,27 @@
     }).filter((row) => row.date !== "未填日期" || row.income || row.expense || row.balance);
   }
 
+  function mapPropertyRows(rows) {
+    const { columns, startIndex } = mapColumns(rows, propertyFieldAliases, /物业|费用|金额|property|amount/i);
+    return rows.slice(startIndex).map((row) => {
+      const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
+      const getMoney = (key) => (columns[key] >= 0 ? parseAmount(row[columns[key]]) : 0);
+      const property = getText("property");
+      const type = getText("type");
+      const vendor = getText("vendor");
+      const amount = getMoney("amount");
+
+      return {
+        period: getText("period") || document.getElementById("propertyPeriod")?.value || currentPeriod(),
+        date: getText("date"),
+        property: property || "未填写物业",
+        type: type || "物业费",
+        vendor: vendor || "-",
+        amount
+      };
+    }).filter((row) => row.amount > 0 || row.property !== "未填写物业" || row.vendor !== "-" || row.type !== "物业费");
+  }
+
   function summarizePayroll(rows) {
     return rows.reduce((total, row) => {
       total.rows += 1;
@@ -258,6 +329,14 @@
       total.net += row.income - row.expense;
       return total;
     }, { rows: 0, income: 0, expense: 0, net: 0 });
+  }
+
+  function summarizeProperty(rows) {
+    return rows.reduce((total, row) => {
+      total.rows += 1;
+      total.amount += row.amount;
+      return total;
+    }, { rows: 0, amount: 0 });
   }
 
   function getSelectedAccount() {
@@ -293,6 +372,7 @@
     setText("uploadCompanyBadge", `当前公司：${company.name}`);
     setText("selectedCapitalCompanyBadge", company.name);
     setText("capitalUploadCompanyBadge", `当前公司：${company.name}`);
+    setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
     renderBankAccounts();
     renderPropertyStats();
   }
@@ -521,6 +601,19 @@
     ));
     setText("importStatus", `${selectedCompany.name} · 已读取`);
     renderPayrollPreview(payrollRows);
+
+    try {
+      const result = await postJson("/api/import/payroll", {
+        company: selectedCompanyPayload(),
+        period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
+        fileName: file.name,
+        rows: payrollRows
+      });
+      setText("importStatus", `${selectedCompany.name} · 已写入MySQL ${result.rows} 人`);
+      await loadOverview();
+    } catch (error) {
+      setText("importStatus", `${selectedCompany.name} · 已本地预览，未连接MySQL`);
+    }
   }
 
   async function readCapitalFile(file) {
@@ -539,6 +632,51 @@
     setText("capitalImportStatus", `${selectedCompany.name} · 已汇总`);
     renderCapitalPreview(capitalRows);
     renderCashFlowSummary(capitalRows);
+
+    try {
+      const result = await postJson("/api/import/capital", {
+        company: selectedCompanyPayload(),
+        account: selectedAccountPayload(),
+        fileName: file.name,
+        rows: capitalRows
+      });
+      setText("capitalImportStatus", `${selectedCompany.name} · 已写入MySQL ${result.inserted} 笔`);
+      await loadOverview();
+    } catch (error) {
+      setText("capitalImportStatus", `${selectedCompany.name} · 已本地预览，未连接MySQL`);
+    }
+  }
+
+  async function readPropertyFile(file) {
+    setText("propertyUploadFileName", file.name);
+    setText("propertyImportStatus", "读取中");
+
+    const rows = await readSheetRows(file, "propertyImportStatus");
+    const propertyRows = mapPropertyRows(rows);
+    const total = summarizeProperty(propertyRows);
+    const selectedCompany = companyData[state.selectedCompany];
+
+    if (propertyRows.length) {
+      selectedCompany.propertyExpenses = propertyRows;
+    }
+
+    setText("propertyImportRows", `${total.rows} 项`);
+    setText("propertyImportCost", formatMoney(total.amount));
+    setText("propertyImportStatus", `${selectedCompany.name} · 已读取`);
+    renderPropertyStats();
+
+    try {
+      const result = await postJson("/api/import/property", {
+        company: selectedCompanyPayload(),
+        period: document.getElementById("propertyPeriod")?.value || currentPeriod(),
+        fileName: file.name,
+        rows: propertyRows
+      });
+      setText("propertyImportStatus", `${selectedCompany.name} · 已写入MySQL ${result.inserted} 项`);
+      await loadOverview();
+    } catch (error) {
+      setText("propertyImportStatus", `${selectedCompany.name} · 已本地预览，未连接MySQL`);
+    }
   }
 
   function downloadPayrollTemplate() {
@@ -563,6 +701,16 @@
     downloadCsv(`${companyData[state.selectedCompany].name}_${account.bank}_资金表模板.csv`, [headers, ...rows]);
   }
 
+  function downloadPropertyTemplate() {
+    const headers = ["月份", "物业所属", "费用类型", "收款方", "金额"];
+    const rows = [
+      [document.getElementById("propertyPeriod")?.value || currentPeriod(), "总部办公室", "房租", "办公楼业主", "12000"],
+      [document.getElementById("propertyPeriod")?.value || currentPeriod(), "总部办公室", "物业费", "物业公司", "3500"],
+      [document.getElementById("propertyPeriod")?.value || currentPeriod(), "总部办公室", "水电", "供电/供水", "2100"]
+    ];
+    downloadCsv(`${companyData[state.selectedCompany].name}_物业费用模板.csv`, [headers, ...rows]);
+  }
+
   function downloadCsv(fileName, rows) {
     const csv = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
@@ -572,6 +720,53 @@
     link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function statusClass(company) {
+    if (Number(company.net) > 0) return "good";
+    if (Number(company.net) < 0) return "loss";
+    return "steady";
+  }
+
+  async function loadOverview() {
+    if (!document.getElementById("todayIncomeMetric")) return;
+    try {
+      const response = await fetch("/api/overview");
+      if (!response.ok) return;
+      const data = await response.json();
+      const companies = data.companies || [];
+      setText("todayIncomeMetric", formatMoney(data.income));
+      setText("todayExpenseMetric", formatMoney(data.expense));
+      setText("todayNetMetric", formatMoney(data.net));
+      setText("profitableCompanyMetric", `${data.profitableCompanies || 0} 家`);
+
+      const grid = document.getElementById("companyStatusGrid");
+      if (grid && companies.length) {
+        grid.innerHTML = companies.map((company) => `
+          <article class="status-card ${statusClass(company)}">
+            <span>${escapeHtml(company.name)}</span>
+            <strong>${escapeHtml(company.status)} ${formatMoney(company.net)}</strong>
+            <small>收入 ${formatMoney(company.income)} · 支出 ${formatMoney(company.expense)}</small>
+          </article>
+        `).join("");
+      }
+
+      const tbody = document.getElementById("companyStatusBody");
+      if (tbody && companies.length) {
+        tbody.innerHTML = companies.map((company) => `
+          <tr>
+            <td>${escapeHtml(company.name)}</td>
+            <td>${formatMoney(company.income)}</td>
+            <td>${formatMoney(company.expense)}</td>
+            <td class="${Number(company.net) >= 0 ? "positive" : "negative"}">${formatMoney(company.net)}</td>
+            <td><span class="status-pill ${statusClass(company)}">${escapeHtml(company.status)}</span></td>
+            <td>${Number(company.net) > 0 ? "今日现金流为正" : (Number(company.net) < 0 ? "今日支出高于收入" : "今日收支平稳")}</td>
+          </tr>
+        `).join("");
+      }
+    } catch (error) {
+      // 本地静态预览没有后端时保留页面上的示例数据。
+    }
   }
 
   function bindEvents() {
@@ -594,6 +789,10 @@
       node.addEventListener("click", () => document.getElementById("capitalFile")?.click());
     });
 
+    document.querySelectorAll("[data-open-property-file]").forEach((node) => {
+      node.addEventListener("click", () => document.getElementById("propertyFile")?.click());
+    });
+
     document.getElementById("payrollFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
       if (file) readPayrollFile(file);
@@ -604,8 +803,14 @@
       if (file) readCapitalFile(file);
     });
 
+    document.getElementById("propertyFile")?.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      if (file) readPropertyFile(file);
+    });
+
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);
     document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
+    document.getElementById("downloadPropertyTemplate")?.addEventListener("click", downloadPropertyTemplate);
 
     document.querySelectorAll(".nav-item").forEach((node) => {
       node.addEventListener("click", () => {
@@ -616,7 +821,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll('input[type="month"][data-default-current]').forEach((node) => {
+      if (!node.value) node.value = currentPeriod();
+    });
     bindEvents();
     updateCompany(state.selectedCompany);
+    loadOverview();
   });
 })();

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工资社保 - 财神爷</title>
+  <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="公司导航">
+      <div class="brand"><div class="brand-mark" aria-hidden="true"><img src="assets/logo-caishenye.svg" alt=""></div><div><strong>财神爷</strong><span>多公司财务管理</span></div></div>
+      <nav class="nav-list" aria-label="主导航">
+        <a class="nav-item" href="index.html"><span class="nav-icon">01</span><span>总览</span></a>
+        <a class="nav-item" href="capital.html"><span class="nav-icon">02</span><span>资金表</span></a>
+        <a class="nav-item active" href="payroll.html"><span class="nav-icon">03</span><span>工资社保</span></a>
+        <a class="nav-item" href="property.html"><span class="nav-icon">04</span><span>物业费用</span></a>
+      </nav>
+      <section class="company-panel" aria-labelledby="company-title-payroll">
+        <h2 id="company-title-payroll">公司</h2>
+        <button class="company-row selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 1,284,600</strong></button>
+        <button class="company-row" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 684,200</strong></button>
+        <button class="company-row" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,108,900</strong></button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">员工薪资数据维护</p><h1>工资社保</h1></div>
+        <div class="topbar-actions">
+          <button class="ghost-button" type="button" id="downloadTemplate">下载模板</button>
+          <button class="primary-button" type="button" data-open-file>上传Excel</button>
+        </div>
+      </header>
+
+      <section class="content-grid">
+        <section class="panel span-12 payroll-workspace" id="payroll" aria-labelledby="payroll-title">
+          <div class="panel-header"><div><p class="eyebrow">工资社保</p><h2 id="payroll-title">工资单工作台</h2></div></div>
+          <div class="payroll-overview" aria-label="工资社保总览">
+            <article><span>本月员工</span><strong id="payrollEmployeeCount">42 人</strong></article>
+            <article><span>实发工资</span><strong id="payrollNetSalary">¥ 121,900</strong></article>
+            <article><span>个税</span><strong id="payrollTax">¥ 8,450</strong></article>
+            <article><span>社保公积金</span><strong id="payrollSocialFund">¥ 46,500</strong></article>
+          </div>
+          <div class="payroll-layout">
+            <section class="payroll-companies" aria-labelledby="payroll-company-title">
+              <div class="section-title-row"><div><p class="eyebrow">各公司情况</p><h3 id="payroll-company-title">选择公司</h3></div><span id="selectedCompanyBadge">示例科技</span></div>
+              <div class="payroll-company-grid">
+                <button class="payroll-company-card selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 78,450</strong><small>18人 · 社保 ¥15,600</small></button>
+                <button class="payroll-company-card" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 54,800</strong><small>14人 · 社保 ¥11,900</small></button>
+                <button class="payroll-company-card" type="button" data-company="holding"><span>控股主体</span><strong>¥ 43,600</strong><small>10人 · 社保 ¥7,200</small></button>
+              </div>
+            </section>
+            <section class="payroll-upload" id="payroll-upload" aria-labelledby="payroll-upload-title">
+              <div class="section-title-row"><div><p class="eyebrow">Excel导入</p><h3 id="payroll-upload-title">工资单上传</h3></div><span id="uploadCompanyBadge">当前公司：示例科技</span></div>
+              <label class="period-control">
+                <span>所属月份</span>
+                <input id="payrollPeriod" type="month" value="2026-06" data-default-current>
+              </label>
+              <label class="upload-zone" id="payrollDropZone" for="payrollFile">
+                <input id="payrollFile" type="file" accept=".xls,.xlsx,.csv">
+                <span class="upload-icon" aria-hidden="true">XLS</span>
+                <strong>选择工资单Excel</strong>
+                <small id="uploadFileName">未选择文件</small>
+              </label>
+              <div class="import-summary" aria-live="polite">
+                <div><span>读取员工</span><strong id="importRows">0 人</strong></div>
+                <div><span>人工成本</span><strong id="importCost">¥ 0</strong></div>
+                <div><span>社保公积金</span><strong id="importSocialFund">¥ 0</strong></div>
+              </div>
+            </section>
+          </div>
+          <div class="payroll-preview">
+            <div class="section-title-row"><div><p class="eyebrow">导入预览</p><h3>员工薪资及社保</h3></div><span id="importStatus">等待上传</span></div>
+            <div class="table-wrap payroll-table-wrap">
+              <table>
+                <thead><tr><th>员工</th><th>应发工资</th><th>实发工资</th><th>个税</th><th>个人社保</th><th>公司社保</th><th>公积金合计</th><th>公司人工成本</th></tr></thead>
+                <tbody id="payrollPreviewBody"><tr><td colspan="8">暂无导入数据</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

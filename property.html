@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>物业费用 - 财神爷</title>
+  <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="公司导航">
+      <div class="brand"><div class="brand-mark" aria-hidden="true"><img src="assets/logo-caishenye.svg" alt=""></div><div><strong>财神爷</strong><span>多公司财务管理</span></div></div>
+      <nav class="nav-list" aria-label="主导航">
+        <a class="nav-item" href="index.html"><span class="nav-icon">01</span><span>总览</span></a>
+        <a class="nav-item" href="capital.html"><span class="nav-icon">02</span><span>资金表</span></a>
+        <a class="nav-item" href="payroll.html"><span class="nav-icon">03</span><span>工资社保</span></a>
+        <a class="nav-item active" href="property.html"><span class="nav-icon">04</span><span>物业费用</span></a>
+      </nav>
+      <section class="company-panel" aria-labelledby="company-title-property">
+        <h2 id="company-title-property">公司</h2>
+        <button class="company-row selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 1,284,600</strong></button>
+        <button class="company-row" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 684,200</strong></button>
+        <button class="company-row" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,108,900</strong></button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">物业费用数据维护</p><h1>物业费用</h1></div>
+        <div class="topbar-actions">
+          <button class="ghost-button" type="button" id="downloadPropertyTemplate">下载模板</button>
+          <button class="primary-button" type="button" data-open-property-file>上传Excel</button>
+        </div>
+      </header>
+
+      <section class="content-grid">
+        <section class="panel span-12 property-workspace" id="property" aria-labelledby="property-title">
+          <div class="panel-header"><div><p class="eyebrow">物业费用</p><h2 id="property-title">每月物业统计</h2></div></div>
+          <div class="property-overview" aria-label="物业费用总览">
+            <article><span>本月物业合计</span><strong id="propertyMonthlyTotal">¥ 28,200</strong></article>
+            <article><span>当前公司</span><strong id="propertyCompanyTotal">¥ 18,600</strong></article>
+            <article><span>费用项目</span><strong id="propertyItemCount">4 项</strong></article>
+            <article><span>主要费用</span><strong id="propertyMainType">房租 ¥ 12,000</strong></article>
+          </div>
+          <div class="property-layout">
+            <section class="property-company-panel" aria-labelledby="property-company-title">
+              <div class="section-title-row"><div><p class="eyebrow">各公司情况</p><h3 id="property-company-title">每家公司物业所属费用</h3></div><span id="selectedPropertyCompanyBadge">示例科技</span></div>
+              <div class="property-company-grid">
+                <button class="property-company-card selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 18,600</strong><small>总部办公室 · 房租/物业/水电/停车</small></button>
+                <button class="property-company-card" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 7,200</strong><small>贸易仓库 · 房租/物业/水电/维修</small></button>
+                <button class="property-company-card" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,400</strong><small>控股办公室 · 停车/水电/维修</small></button>
+              </div>
+            </section>
+            <section class="property-upload" id="property-upload" aria-labelledby="property-upload-title">
+              <div class="section-title-row"><div><p class="eyebrow">Excel导入</p><h3 id="property-upload-title">物业费用上传</h3></div><span id="propertyUploadCompanyBadge">当前公司：示例科技</span></div>
+              <label class="period-control">
+                <span>所属月份</span>
+                <input id="propertyPeriod" type="month" value="2026-06" data-default-current>
+              </label>
+              <label class="upload-zone" for="propertyFile">
+                <input id="propertyFile" type="file" accept=".xls,.xlsx,.csv">
+                <span class="upload-icon" aria-hidden="true">FEE</span>
+                <strong>选择物业费用Excel</strong>
+                <small id="propertyUploadFileName">未选择文件</small>
+              </label>
+              <div class="import-summary" aria-live="polite">
+                <div><span>读取项目</span><strong id="propertyImportRows">0 项</strong></div>
+                <div><span>费用合计</span><strong id="propertyImportCost">¥ 0</strong></div>
+                <div><span>状态</span><strong id="propertyImportStatus">等待上传</strong></div>
+              </div>
+            </section>
+          </div>
+          <div class="property-layout">
+            <section class="property-breakdown-panel" aria-labelledby="property-breakdown-title">
+              <div class="section-title-row"><div><p class="eyebrow">费用分类</p><h3 id="property-breakdown-title">当前公司费用结构</h3></div></div>
+              <div class="property-category-list" id="propertyCategoryList"></div>
+            </section>
+            <section class="property-table-panel" aria-labelledby="property-company-table-title">
+              <div class="section-title-row compact"><div><p class="eyebrow">月度汇总</p><h3 id="property-company-table-title">各公司物业费用</h3></div></div>
+              <div class="table-wrap property-table-wrap">
+                <table>
+                  <thead><tr><th>公司</th><th>物业所属</th><th>费用类型</th><th>项目数</th><th>本月费用</th></tr></thead>
+                  <tbody id="propertyCompanyBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+          <div class="property-table-panel">
+            <div class="section-title-row compact"><div><p class="eyebrow">明细</p><h3>当前公司物业费用明细</h3></div></div>
+            <div class="table-wrap property-table-wrap">
+              <table>
+                <thead><tr><th>月份</th><th>公司</th><th>物业所属</th><th>费用类型</th><th>收款方</th><th>金额</th></tr></thead>
+                <tbody id="propertyDetailBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

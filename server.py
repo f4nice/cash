@@ -1,0 +1,625 @@
+#!/usr/bin/env python3
+import json
+import os
+import re
+import uuid
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
+
+try:
+    import pymysql
+    from pymysql.cursors import DictCursor
+except ImportError:  # The static pages can still be served while the server is being prepared.
+    pymysql = None
+    DictCursor = None
+
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+MAX_BODY_BYTES = 25 * 1024 * 1024
+
+SEED_COMPANIES = [
+    {
+        "code": "A001",
+        "name": "示例科技",
+        "accounts": [
+            ("tech-cmb-basic", "招商银行", "基本户", "bank", 862400),
+            ("tech-ccb-general", "建设银行", "一般户", "bank", 332200),
+            ("tech-alipay", "支付宝", "企业账户", "alipay", 90000),
+        ],
+    },
+    {
+        "code": "A002",
+        "name": "示例贸易",
+        "accounts": [
+            ("trade-icbc-basic", "工商银行", "基本户", "bank", 596400),
+            ("trade-wechat", "微信支付", "商户号", "wechat", 87800),
+        ],
+    },
+    {
+        "code": "A003",
+        "name": "控股主体",
+        "accounts": [
+            ("holding-boc-general", "中国银行", "一般户", "bank", 1718900),
+            ("holding-securities", "证券账户", "资金账户", "securities", 390000),
+        ],
+    },
+]
+
+
+class ApiError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+def json_default(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return str(value)
+
+
+def get_db():
+    if pymysql is None:
+        raise ApiError(503, "服务器缺少 PyMySQL，暂时不能连接 MySQL")
+    return pymysql.connect(
+        host=os.getenv("MYSQL_HOST", "127.0.0.1"),
+        port=int(os.getenv("MYSQL_PORT", "3306")),
+        user=os.getenv("MYSQL_USER", "caishenye_app"),
+        password=os.getenv("MYSQL_PASSWORD", ""),
+        database=os.getenv("MYSQL_DATABASE", "caishenye"),
+        charset="utf8mb4",
+        cursorclass=DictCursor,
+        autocommit=False,
+    )
+
+
+def parse_amount(value):
+    if value is None or value == "":
+        return Decimal("0")
+    if isinstance(value, (int, float, Decimal)):
+        return Decimal(str(value)).quantize(Decimal("0.01"))
+    normalized = re.sub(r"[^\d.\-]", "", str(value).replace(",", ""))
+    if normalized in ("", "-", ".", "-."):
+        return Decimal("0")
+    return Decimal(normalized).quantize(Decimal("0.01"))
+
+
+def parse_month(value):
+    text = str(value or "").strip()
+    match = re.search(r"(\d{4})[-/.年](\d{1,2})", text)
+    if match:
+        return f"{int(match.group(1)):04d}-{int(match.group(2)):02d}"
+    return date.today().strftime("%Y-%m")
+
+
+def parse_day(value, fallback=None):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return fallback or date.today()
+    text = text.replace("年", "-").replace("月", "-").replace("日", "")
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y-%m", "%Y/%m"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            return parsed.date()
+        except ValueError:
+            pass
+    return fallback or date.today()
+
+
+def month_bounds(period):
+    month = parse_month(period)
+    start = datetime.strptime(f"{month}-01", "%Y-%m-%d").date()
+    if start.month == 12:
+        next_month = date(start.year + 1, 1, 1)
+    else:
+        next_month = date(start.year, start.month + 1, 1)
+    return month, start, next_month - timedelta(days=1)
+
+
+def account_type_for(bank_name, account_name):
+    text = f"{bank_name} {account_name}"
+    if "支付宝" in text:
+        return "alipay"
+    if "微信" in text:
+        return "wechat"
+    if "证券" in text:
+        return "securities"
+    if "现金" in text:
+        return "cash"
+    return "bank"
+
+
+def property_type(value):
+    text = str(value or "")
+    if "房租" in text or "租金" in text:
+        return "rent"
+    if "水" in text or "电" in text:
+        return "utilities"
+    if "停车" in text:
+        return "parking"
+    if "维修" in text or "修理" in text:
+        return "repair"
+    if "物业" in text:
+        return "property_management"
+    return "other"
+
+
+def fetch_one(cur, sql, args):
+    cur.execute(sql, args)
+    return cur.fetchone()
+
+
+def ensure_company(cur, code, name):
+    code = str(code or "").strip() or "A001"
+    name = str(name or code).strip()
+    cur.execute(
+        """
+        INSERT INTO companies (company_code, company_name, remark)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE company_name = VALUES(company_name), status = 'active'
+        """,
+        (code, name, "系统自动创建"),
+    )
+    row = fetch_one(cur, "SELECT id, company_code, company_name FROM companies WHERE company_code = %s", (code,))
+    if not row:
+        raise ApiError(500, f"公司不存在：{code}")
+    return row
+
+
+def ensure_account(cur, company_id, bank_name, account_name, account_key=None, opening_balance=0):
+    bank_name = str(bank_name or "默认银行").strip()
+    account_name = str(account_name or "默认账户").strip()
+    account_key = str(account_key or "").strip() or None
+    row = None
+    if account_key:
+        row = fetch_one(
+            cur,
+            "SELECT id, bank_name, account_name FROM bank_accounts WHERE company_id = %s AND account_no = %s LIMIT 1",
+            (company_id, account_key),
+        )
+    if not row:
+        row = fetch_one(
+            cur,
+            """
+            SELECT id, bank_name, account_name
+            FROM bank_accounts
+            WHERE company_id = %s AND bank_name = %s AND account_name = %s
+            LIMIT 1
+            """,
+            (company_id, bank_name, account_name),
+        )
+    if row:
+        return row
+    cur.execute(
+        """
+        INSERT INTO bank_accounts
+          (company_id, account_name, bank_name, account_no, account_type, opening_balance)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            company_id,
+            account_name,
+            bank_name,
+            account_key,
+            account_type_for(bank_name, account_name),
+            opening_balance,
+        ),
+    )
+    return {
+        "id": cur.lastrowid,
+        "bank_name": bank_name,
+        "account_name": account_name,
+    }
+
+
+def default_account(cur, company):
+    row = fetch_one(
+        cur,
+        """
+        SELECT id, bank_name, account_name
+        FROM bank_accounts
+        WHERE company_id = %s AND status = 'active'
+        ORDER BY id
+        LIMIT 1
+        """,
+        (company["id"],),
+    )
+    if row:
+        return row
+    return ensure_account(cur, company["id"], "默认银行", "基本户")
+
+
+def ensure_seed_data():
+    if pymysql is None:
+        return
+    try:
+        conn = get_db()
+    except Exception as exc:
+        print(f"[startup] MySQL unavailable: {exc}")
+        return
+    with conn:
+        with conn.cursor() as cur:
+            for seed in SEED_COMPANIES:
+                company = ensure_company(cur, seed["code"], seed["name"])
+                for key, bank, account, account_type, balance in seed["accounts"]:
+                    account_row = ensure_account(cur, company["id"], bank, account, key, balance)
+                    cur.execute(
+                        """
+                        UPDATE bank_accounts
+                        SET bank_name = %s,
+                            account_name = %s,
+                            account_type = %s,
+                            opening_balance = %s,
+                            status = 'active'
+                        WHERE id = %s
+                        """,
+                        (bank, account, account_type, balance, account_row["id"]),
+                    )
+        conn.commit()
+
+
+def load_overview():
+    today = date.today()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  COALESCE(SUM(CASE WHEN t.direction = 'in' THEN t.amount ELSE 0 END), 0) AS income,
+                  COALESCE(SUM(CASE WHEN t.direction = 'out' THEN t.amount ELSE 0 END), 0) AS expense
+                FROM companies c
+                LEFT JOIN cash_transactions t
+                  ON t.company_id = c.id AND t.txn_date = %s
+                WHERE c.status = 'active'
+                GROUP BY c.id, c.company_code, c.company_name
+                ORDER BY c.id
+                """,
+                (today,),
+            )
+            rows = cur.fetchall()
+    companies = []
+    total_income = Decimal("0")
+    total_expense = Decimal("0")
+    profitable = 0
+    for row in rows:
+        income = row["income"] or Decimal("0")
+        expense = row["expense"] or Decimal("0")
+        net = income - expense
+        total_income += income
+        total_expense += expense
+        if net > 0:
+            profitable += 1
+        companies.append(
+            {
+                "code": row["company_code"],
+                "name": row["company_name"],
+                "income": income,
+                "expense": expense,
+                "net": net,
+                "status": "盈利" if net > 0 else ("亏损" if net < 0 else "平稳"),
+            }
+        )
+    return {
+        "date": today.isoformat(),
+        "income": total_income,
+        "expense": total_expense,
+        "net": total_income - total_expense,
+        "profitableCompanies": profitable,
+        "companies": companies,
+    }
+
+
+def insert_cash(cur, company_id, account_id, txn_date, direction, category, amount, counterparty="", description="", doc_no=None):
+    amount = parse_amount(amount)
+    if amount <= 0:
+        return 0
+    cur.execute(
+        """
+        INSERT INTO cash_transactions
+          (company_id, account_id, txn_date, direction, category, counterparty, amount, description, source_doc_no)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (company_id, account_id, txn_date, direction, category, counterparty or None, amount, description or None, doc_no),
+    )
+    return 1
+
+
+def import_capital(payload):
+    rows = payload.get("rows") or []
+    if not rows:
+        raise ApiError(400, "没有读取到资金表数据")
+    company_payload = payload.get("company") or {}
+    account_payload = payload.get("account") or {}
+    import_no = f"CAPITAL-{uuid.uuid4().hex[:12]}"
+    inserted = 0
+    total_in = Decimal("0")
+    total_out = Decimal("0")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = ensure_company(cur, company_payload.get("code"), company_payload.get("name"))
+            account = ensure_account(
+                cur,
+                company["id"],
+                account_payload.get("bank"),
+                account_payload.get("accountName"),
+                account_payload.get("key"),
+            )
+            for index, row in enumerate(rows, start=1):
+                txn_date = parse_day(row.get("date"))
+                category = str(row.get("summary") or "银行流水").strip()
+                counterparty = str(row.get("counterparty") or "").strip()
+                description = str(row.get("summary") or "").strip()
+                income = parse_amount(row.get("income"))
+                expense = parse_amount(row.get("expense"))
+                doc_no = f"{import_no}-{index}"
+                inserted += insert_cash(cur, company["id"], account["id"], txn_date, "in", category, income, counterparty, description, doc_no)
+                inserted += insert_cash(cur, company["id"], account["id"], txn_date, "out", category, expense, counterparty, description, doc_no)
+                total_in += income
+                total_out += expense
+                balance = parse_amount(row.get("balance"))
+                if balance:
+                    cur.execute(
+                        """
+                        INSERT INTO capital_snapshots (company_id, account_id, snapshot_date, balance, remark)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE balance = VALUES(balance), remark = VALUES(remark)
+                        """,
+                        (company["id"], account["id"], txn_date, balance, f"导入：{import_no}"),
+                    )
+        conn.commit()
+    return {"importNo": import_no, "inserted": inserted, "income": total_in, "expense": total_out, "net": total_in - total_out}
+
+
+def import_payroll(payload):
+    rows = payload.get("rows") or []
+    if not rows:
+        raise ApiError(400, "没有读取到工资单数据")
+    company_payload = payload.get("company") or {}
+    period, _, end_day = month_bounds(payload.get("period"))
+    file_name = str(payload.get("fileName") or "工资单导入.xlsx")
+    import_no = f"PAYROLL-{uuid.uuid4().hex[:12]}"
+    totals = {
+        "net": Decimal("0"),
+        "tax": Decimal("0"),
+        "social": Decimal("0"),
+        "fund": Decimal("0"),
+        "companyCost": Decimal("0"),
+    }
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = ensure_company(cur, company_payload.get("code"), company_payload.get("name"))
+            account = default_account(cur, company)
+            cur.execute(
+                """
+                INSERT INTO payroll_import_batches
+                  (company_id, period_month, file_name, file_hash, imported_by, status, remark)
+                VALUES (%s, %s, %s, %s, %s, 'confirmed', %s)
+                """,
+                (company["id"], period, file_name, import_no, "web", "页面上传入库"),
+            )
+            batch_id = cur.lastrowid
+            for index, row in enumerate(rows, start=1):
+                employee_no = str(row.get("employeeNo") or "").strip()
+                employee_name = str(row.get("name") or "").strip() or f"未命名员工{index}"
+                employee_id = None
+                if employee_no:
+                    cur.execute(
+                        """
+                        INSERT INTO employees (company_id, employee_no, employee_name, status)
+                        VALUES (%s, %s, %s, 'active')
+                        ON DUPLICATE KEY UPDATE employee_name = VALUES(employee_name), status = 'active'
+                        """,
+                        (company["id"], employee_no, employee_name),
+                    )
+                    employee = fetch_one(
+                        cur,
+                        "SELECT id FROM employees WHERE company_id = %s AND employee_no = %s",
+                        (company["id"], employee_no),
+                    )
+                    employee_id = employee["id"] if employee else None
+                gross = parse_amount(row.get("gross"))
+                net = parse_amount(row.get("net"))
+                tax = parse_amount(row.get("tax"))
+                employee_social = parse_amount(row.get("employeeSocial"))
+                employer_social = parse_amount(row.get("employerSocial"))
+                employee_fund = parse_amount(row.get("employeeFund"))
+                employer_fund = parse_amount(row.get("employerFund"))
+                totals["net"] += net
+                totals["tax"] += tax
+                totals["social"] += employee_social + employer_social
+                totals["fund"] += employee_fund + employer_fund
+                totals["companyCost"] += gross + employer_social + employer_fund
+                cur.execute(
+                    """
+                    INSERT INTO payroll_records (
+                      batch_id, company_id, employee_id, period_month, employee_no_raw, employee_name_raw,
+                      gross_salary, employee_social_security, employee_housing_fund, individual_income_tax,
+                      net_salary, employer_social_security, employer_housing_fund, source_row_no
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        batch_id,
+                        company["id"],
+                        employee_id,
+                        period,
+                        employee_no or None,
+                        employee_name,
+                        gross,
+                        employee_social,
+                        employee_fund,
+                        tax,
+                        net,
+                        employer_social,
+                        employer_fund,
+                        index,
+                    ),
+                )
+            cash_items = [
+                ("工资发放", "员工工资", totals["net"]),
+                ("个税缴纳", "税务局", totals["tax"]),
+                ("社保缴纳", "社保机构", totals["social"]),
+                ("公积金缴纳", "公积金中心", totals["fund"]),
+            ]
+            for category, counterparty, amount in cash_items:
+                insert_cash(
+                    cur,
+                    company["id"],
+                    account["id"],
+                    end_day,
+                    "out",
+                    category,
+                    amount,
+                    counterparty,
+                    f"{period} {category}",
+                    f"{import_no}-{category}",
+                )
+        conn.commit()
+    return {"importNo": import_no, "rows": len(rows), **totals}
+
+
+def import_property(payload):
+    rows = payload.get("rows") or []
+    if not rows:
+        raise ApiError(400, "没有读取到物业费用数据")
+    company_payload = payload.get("company") or {}
+    default_period = payload.get("period")
+    import_no = f"PROPERTY-{uuid.uuid4().hex[:12]}"
+    inserted = 0
+    total = Decimal("0")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = ensure_company(cur, company_payload.get("code"), company_payload.get("name"))
+            account = default_account(cur, company)
+            for index, row in enumerate(rows, start=1):
+                period_text = row.get("period") or default_period
+                period, start_day, end_day = month_bounds(period_text)
+                expense_date = parse_day(row.get("date") or f"{period}-01", start_day)
+                amount = parse_amount(row.get("amount"))
+                if amount <= 0:
+                    continue
+                item_type = str(row.get("type") or "物业费").strip()
+                vendor = str(row.get("vendor") or "").strip()
+                property_name = str(row.get("property") or "未填写物业").strip()
+                doc_no = f"{import_no}-{index}"
+                cur.execute(
+                    """
+                    INSERT INTO property_expenses (
+                      company_id, account_id, expense_date, fee_period_start, fee_period_end,
+                      property_name, vendor_name, expense_type, amount, description, source_doc_no
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        company["id"],
+                        account["id"],
+                        expense_date,
+                        start_day,
+                        end_day,
+                        property_name,
+                        vendor or None,
+                        property_type(item_type),
+                        amount,
+                        item_type,
+                        doc_no,
+                    ),
+                )
+                inserted += 1
+                total += amount
+                insert_cash(
+                    cur,
+                    company["id"],
+                    account["id"],
+                    expense_date,
+                    "out",
+                    item_type,
+                    amount,
+                    vendor,
+                    f"{property_name} {item_type}",
+                    doc_no,
+                )
+        conn.commit()
+    return {"importNo": import_no, "inserted": inserted, "amount": total}
+
+
+class Handler(SimpleHTTPRequestHandler):
+    server_version = "CaishenyeHTTP/1.0"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=APP_DIR, **kwargs)
+
+    def send_json(self, status, data):
+        body = json.dumps(data, ensure_ascii=False, default=json_default).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def read_json(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        if length > MAX_BODY_BYTES:
+            raise ApiError(413, "上传数据太大")
+        body = self.rfile.read(length)
+        if not body:
+            return {}
+        return json.loads(body.decode("utf-8"))
+
+    def api(self, method, path):
+        if method == "GET" and path == "/api/health":
+            return {"ok": True, "database": os.getenv("MYSQL_DATABASE", "caishenye")}
+        if method == "GET" and path == "/api/overview":
+            return load_overview()
+        if method == "POST" and path == "/api/import/capital":
+            return import_capital(self.read_json())
+        if method == "POST" and path == "/api/import/payroll":
+            return import_payroll(self.read_json())
+        if method == "POST" and path == "/api/import/property":
+            return import_property(self.read_json())
+        raise ApiError(404, "接口不存在")
+
+    def handle_api(self, method):
+        path = urlparse(self.path).path
+        try:
+            self.send_json(200, self.api(method, path))
+        except ApiError as exc:
+            self.send_json(exc.status, {"ok": False, "message": exc.message})
+        except Exception as exc:
+            print(f"[api] {method} {path}: {exc}")
+            self.send_json(500, {"ok": False, "message": "服务器处理失败"})
+
+    def do_GET(self):
+        if urlparse(self.path).path.startswith("/api/"):
+            self.handle_api("GET")
+            return
+        super().do_GET()
+
+    def do_POST(self):
+        if urlparse(self.path).path.startswith("/api/"):
+            self.handle_api("POST")
+            return
+        self.send_error(404)
+
+
+def main():
+    ensure_seed_data()
+    host = os.getenv("APP_HOST", "0.0.0.0")
+    port = int(os.getenv("APP_PORT", "8001"))
+    httpd = ThreadingHTTPServer((host, port), Handler)
+    print(f"财神爷服务已启动：http://{host}:{port}")
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

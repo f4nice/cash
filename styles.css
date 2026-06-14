@@ -236,6 +236,103 @@ h2 {
   font-weight: 700;
 }
 
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  text-decoration: none;
+}
+
+.readonly-actions {
+  flex-wrap: wrap;
+}
+
+.dashboard-panel {
+  min-height: 0;
+}
+
+.status-grid,
+.quick-link-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.status-card,
+.quick-link-grid a {
+  display: grid;
+  gap: 8px;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+  text-decoration: none;
+}
+
+.status-card span,
+.status-card small,
+.quick-link-grid span {
+  color: var(--muted);
+}
+
+.status-card strong,
+.quick-link-grid strong {
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.status-card.good {
+  border-color: rgba(15, 143, 122, 0.24);
+  background: #eef8f5;
+}
+
+.status-card.steady {
+  border-color: rgba(217, 145, 27, 0.28);
+  background: #fff8ea;
+}
+
+.status-card.loss {
+  border-color: rgba(201, 93, 77, 0.26);
+  background: #fff2ef;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #eef2f0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-pill.good {
+  color: var(--teal-dark);
+  background: #e4f4f0;
+}
+
+.status-pill.steady {
+  color: #8a5a08;
+  background: #fff1d2;
+}
+
+.status-pill.loss {
+  color: #9e392d;
+  background: #ffe0dc;
+}
+
+.negative {
+  color: var(--red);
+  font-weight: 800;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -581,7 +678,8 @@ td {
 .capital-cashflow-card,
 .payroll-companies,
 .payroll-upload,
-.payroll-preview {
+.payroll-preview,
+.property-upload {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -706,6 +804,26 @@ td {
 
 .bank-account-button strong {
   font-size: 19px;
+}
+
+.period-control {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.period-control input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
 }
 
 .upload-zone {
@@ -934,6 +1052,11 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .status-grid,
+  .quick-link-grid {
+    grid-template-columns: 1fr;
+  }
+
   .span-5,
   .span-6,
   .span-7 {
@@ -1017,6 +1140,8 @@ td {
   .property-category-list,
   .payroll-company-grid,
   .bank-account-list,
+  .status-grid,
+  .quick-link-grid,
   .capital-import-summary,
   .import-summary {
     grid-template-columns: 1fr;

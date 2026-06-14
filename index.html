@@ -6,7 +6,6 @@
   <title>财神爷财务驾驶舱</title>
   <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -23,19 +22,19 @@
       </div>
 
       <nav class="nav-list" aria-label="主导航">
-        <a class="nav-item active" href="#overview" title="总览">
+        <a class="nav-item active" href="index.html" title="总览">
           <span class="nav-icon" aria-hidden="true">01</span>
           <span>总览</span>
         </a>
-        <a class="nav-item" href="#capital" title="资金表">
+        <a class="nav-item" href="capital.html" title="资金表">
           <span class="nav-icon" aria-hidden="true">02</span>
           <span>资金表</span>
         </a>
-        <a class="nav-item" href="#payroll" title="工资社保">
+        <a class="nav-item" href="payroll.html" title="工资社保">
           <span class="nav-icon" aria-hidden="true">03</span>
           <span>工资社保</span>
         </a>
-        <a class="nav-item" href="#property" title="物业费用">
+        <a class="nav-item" href="property.html" title="物业费用">
           <span class="nav-icon" aria-hidden="true">04</span>
           <span>物业费用</span>
         </a>
@@ -61,571 +60,128 @@
     <main class="main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">2026年6月 · 公司财务首页</p>
-          <h1>财务驾驶舱</h1>
+          <p class="eyebrow">2026年6月14日 · 今日经营</p>
+          <h1>财务总览</h1>
         </div>
-        <div class="topbar-actions">
-          <button class="icon-button" type="button" title="筛选月份" aria-label="筛选月份">6月</button>
-          <button class="ghost-button" type="button" data-scroll-target="capital-upload">上传资金表</button>
-          <button class="primary-button" type="button" data-scroll-target="payroll-upload">上传工资单</button>
+        <div class="topbar-actions readonly-actions">
+          <a class="ghost-button link-button" href="capital.html">资金表</a>
+          <a class="ghost-button link-button" href="payroll.html">工资社保</a>
+          <a class="ghost-button link-button" href="property.html">物业费用</a>
         </div>
       </header>
 
-      <section class="metric-grid" id="overview" aria-label="核心指标">
+      <section class="metric-grid" id="overview" aria-label="今日核心指标">
         <article class="metric-tile">
-          <span>资金余额</span>
-          <strong>¥ 4,077,700</strong>
-          <small>较上月 +8.6%</small>
+          <span>今日收入</span>
+          <strong id="todayIncomeMetric">¥ 126,800</strong>
+          <small>销售回款、服务收入</small>
         </article>
         <article class="metric-tile">
-          <span>当月收入</span>
-          <strong>¥ 936,000</strong>
-          <small>三家公司合计</small>
+          <span>今日支出</span>
+          <strong id="todayExpenseMetric">¥ 78,450</strong>
+          <small>采购、工资、物业</small>
         </article>
         <article class="metric-tile">
-          <span>净利润</span>
-          <strong>¥ 218,400</strong>
-          <small>净利率 23.3%</small>
+          <span>今日净现金流</span>
+          <strong id="todayNetMetric">¥ 48,350</strong>
+          <small>收入 - 支出</small>
         </article>
         <article class="metric-tile">
-          <span>人工成本</span>
-          <strong>¥ 176,850</strong>
-          <small>含个税、社保、公积金</small>
+          <span>盈利公司</span>
+          <strong id="profitableCompanyMetric">3 家</strong>
+          <small>全部公司为正收益</small>
         </article>
       </section>
 
       <section class="content-grid">
-        <section class="panel span-12 capital-workspace" id="capital" aria-labelledby="capital-title">
+        <section class="panel span-12 dashboard-panel" aria-labelledby="profit-status-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">资金表</p>
-              <h2 id="capital-title">公司资金表工作台</h2>
-            </div>
-            <div class="capital-actions">
-              <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
-              <button class="primary-button" type="button" data-open-capital-file>上传Excel</button>
+              <p class="eyebrow">各公司盈利状态</p>
+              <h2 id="profit-status-title">今日公司经营状态</h2>
             </div>
           </div>
 
-          <div class="capital-overview" aria-label="资金总览">
-            <article>
-              <span>全部资金</span>
-              <strong>¥ 4,077,700</strong>
+          <div class="status-grid" id="companyStatusGrid">
+            <article class="status-card good">
+              <span>示例科技</span>
+              <strong>盈利 ¥ 32,600</strong>
+              <small>收入 ¥68,000 · 支出 ¥35,400</small>
             </article>
-            <article>
-              <span>银行账户</span>
-              <strong id="capitalAccountCount">7 个</strong>
+            <article class="status-card good">
+              <span>示例贸易</span>
+              <strong>盈利 ¥ 11,900</strong>
+              <small>收入 ¥38,200 · 支出 ¥26,300</small>
             </article>
-            <article>
-              <span>本月流入</span>
-              <strong id="capitalMonthlyIn">¥ 936,000</strong>
-            </article>
-            <article>
-              <span>本月流出</span>
-              <strong id="capitalMonthlyOut">¥ 717,600</strong>
+            <article class="status-card steady">
+              <span>控股主体</span>
+              <strong>盈利 ¥ 3,850</strong>
+              <small>收入 ¥20,600 · 支出 ¥16,750</small>
             </article>
           </div>
 
-          <div class="capital-layout">
-            <section class="capital-companies" aria-labelledby="capital-company-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">所有资金</p>
-                  <h3 id="capital-company-title">按公司和银行查看</h3>
-                </div>
-                <span id="selectedCapitalCompanyBadge">示例科技</span>
-              </div>
-
-              <div class="capital-company-grid">
-                <button class="capital-company-card selected" type="button" data-company="tech">
-                  <span>示例科技</span>
-                  <strong>¥ 1,284,600</strong>
-                  <small>招商银行、建设银行、支付宝</small>
-                </button>
-                <button class="capital-company-card" type="button" data-company="trade">
-                  <span>示例贸易</span>
-                  <strong>¥ 684,200</strong>
-                  <small>工商银行、微信</small>
-                </button>
-                <button class="capital-company-card" type="button" data-company="holding">
-                  <span>控股主体</span>
-                  <strong>¥ 2,108,900</strong>
-                  <small>中国银行、证券账户</small>
-                </button>
-              </div>
-
-              <div class="bank-account-panel">
-                <div class="section-title-row compact">
-                  <div>
-                    <p class="eyebrow">所属银行</p>
-                    <h3>选择提交账户</h3>
-                  </div>
-                  <span id="selectedBankBadge">招商银行 基本户</span>
-                </div>
-                <div class="bank-account-list" id="bankAccountList"></div>
-              </div>
-            </section>
-
-            <section class="capital-upload" id="capital-upload" aria-labelledby="capital-upload-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">Excel导入</p>
-                  <h3 id="capital-upload-title">银行资金表上传</h3>
-                </div>
-                <span id="capitalUploadCompanyBadge">当前公司：示例科技</span>
-              </div>
-
-              <label class="upload-zone" for="capitalFile">
-                <input id="capitalFile" type="file" accept=".xls,.xlsx,.csv">
-                <span class="upload-icon" aria-hidden="true">BANK</span>
-                <strong>选择银行流水或资金表</strong>
-                <small id="capitalUploadFileName">未选择文件</small>
-              </label>
-
-              <div class="import-summary capital-import-summary" aria-live="polite">
-                <div>
-                  <span>读取流水</span>
-                  <strong id="capitalImportRows">0 笔</strong>
-                </div>
-                <div>
-                  <span>流入</span>
-                  <strong id="capitalImportIn">¥ 0</strong>
-                </div>
-                <div>
-                  <span>流出</span>
-                  <strong id="capitalImportOut">¥ 0</strong>
-                </div>
-                <div>
-                  <span>净现金流</span>
-                  <strong id="capitalImportNet">¥ 0</strong>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="capital-detail-grid">
-            <section class="capital-chart-card" aria-labelledby="capital-trend-title">
-              <div class="section-title-row compact">
-                <div>
-                  <p class="eyebrow">资金趋势</p>
-                  <h3 id="capital-trend-title">公司资金走势</h3>
-                </div>
-                <div class="segmented" aria-label="周期">
-                  <button class="selected" type="button">月</button>
-                  <button type="button">季</button>
-                  <button type="button">年</button>
-                </div>
-              </div>
-              <div class="cash-chart" aria-label="资金走势图">
-                <div class="bar" style="--height: 42%"><span>1月</span></div>
-                <div class="bar" style="--height: 55%"><span>2月</span></div>
-                <div class="bar" style="--height: 48%"><span>3月</span></div>
-                <div class="bar" style="--height: 62%"><span>4月</span></div>
-                <div class="bar" style="--height: 74%"><span>5月</span></div>
-                <div class="bar accent" style="--height: 88%"><span>6月</span></div>
-              </div>
-            </section>
-
-            <section class="capital-cashflow-card" aria-labelledby="cashflow-title">
-              <div class="section-title-row compact">
-                <div>
-                  <p class="eyebrow">现金流表</p>
-                  <h3 id="cashflow-title">公司现金流汇总</h3>
-                </div>
-                <span id="capitalImportStatus">等待上传</span>
-              </div>
-              <div class="table-wrap cashflow-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>日期</th>
-                      <th>公司</th>
-                      <th>银行账户</th>
-                      <th>摘要</th>
-                      <th>流入</th>
-                      <th>流出</th>
-                      <th>净现金流</th>
-                      <th>余额</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cashFlowBody">
-                    <tr>
-                      <td>2026-06</td>
-                      <td>示例科技</td>
-                      <td>招商银行 基本户</td>
-                      <td>经营收支</td>
-                      <td>¥ 486,000</td>
-                      <td>¥ 281,400</td>
-                      <td class="positive">¥ 204,600</td>
-                      <td>¥ 1,284,600</td>
-                    </tr>
-                    <tr>
-                      <td>2026-06</td>
-                      <td>示例贸易</td>
-                      <td>工商银行 基本户</td>
-                      <td>经营收支</td>
-                      <td>¥ 312,000</td>
-                      <td>¥ 249,600</td>
-                      <td class="positive">¥ 62,400</td>
-                      <td>¥ 684,200</td>
-                    </tr>
-                    <tr>
-                      <td>2026-06</td>
-                      <td>控股主体</td>
-                      <td>中国银行 一般户</td>
-                      <td>投资及管理</td>
-                      <td>¥ 138,000</td>
-                      <td>¥ 108,800</td>
-                      <td class="positive">¥ 29,200</td>
-                      <td>¥ 2,108,900</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-
-          <div class="capital-preview">
-            <div class="section-title-row compact">
-              <div>
-                <p class="eyebrow">导入预览</p>
-                <h3>银行流水明细</h3>
-              </div>
-              <span id="capitalUploadBankBadge">当前银行：招商银行 基本户</span>
-            </div>
-            <div class="table-wrap cashflow-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>日期</th>
-                    <th>银行</th>
-                    <th>账户</th>
-                    <th>摘要</th>
-                    <th>对方户名</th>
-                    <th>流入</th>
-                    <th>流出</th>
-                    <th>余额</th>
-                  </tr>
-                </thead>
-                <tbody id="capitalPreviewBody">
-                  <tr>
-                    <td colspan="8">暂无导入数据</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel span-12" aria-labelledby="profit-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">盈利情况</p>
-              <h2 id="profit-title">利润结构</h2>
-            </div>
-          </div>
-          <div class="profit-ring" aria-label="利润结构图">
-            <div class="ring">
-              <span>23.3%</span>
-              <small>净利率</small>
-            </div>
-            <ul class="legend">
-              <li><span class="dot teal"></span>收入 ¥936,000</li>
-              <li><span class="dot amber"></span>成本 ¥541,200</li>
-              <li><span class="dot red"></span>费用 ¥176,400</li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="panel span-12 payroll-workspace" id="payroll" aria-labelledby="payroll-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">工资社保</p>
-              <h2 id="payroll-title">工资单工作台</h2>
-            </div>
-            <div class="payroll-actions">
-              <button class="ghost-button" type="button" id="downloadTemplate">下载模板</button>
-              <button class="primary-button" type="button" data-open-file>上传Excel</button>
-            </div>
-          </div>
-
-          <div class="payroll-overview" aria-label="工资社保总览">
-            <article>
-              <span>本月员工</span>
-              <strong id="payrollEmployeeCount">42 人</strong>
-            </article>
-            <article>
-              <span>实发工资</span>
-              <strong id="payrollNetSalary">¥ 121,900</strong>
-            </article>
-            <article>
-              <span>个税</span>
-              <strong id="payrollTax">¥ 8,450</strong>
-            </article>
-            <article>
-              <span>社保公积金</span>
-              <strong id="payrollSocialFund">¥ 46,500</strong>
-            </article>
-          </div>
-
-          <div class="payroll-layout">
-            <section class="payroll-companies" aria-labelledby="payroll-company-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">各公司情况</p>
-                  <h3 id="payroll-company-title">选择公司</h3>
-                </div>
-                <span id="selectedCompanyBadge">示例科技</span>
-              </div>
-
-              <div class="payroll-company-grid">
-                <button class="payroll-company-card selected" type="button" data-company="tech">
-                  <span>示例科技</span>
-                  <strong>¥ 78,450</strong>
-                  <small>18人 · 社保 ¥15,600</small>
-                </button>
-                <button class="payroll-company-card" type="button" data-company="trade">
-                  <span>示例贸易</span>
-                  <strong>¥ 54,800</strong>
-                  <small>14人 · 社保 ¥11,900</small>
-                </button>
-                <button class="payroll-company-card" type="button" data-company="holding">
-                  <span>控股主体</span>
-                  <strong>¥ 43,600</strong>
-                  <small>10人 · 社保 ¥7,200</small>
-                </button>
-              </div>
-            </section>
-
-            <section class="payroll-upload" id="payroll-upload" aria-labelledby="payroll-upload-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">Excel导入</p>
-                  <h3 id="payroll-upload-title">工资单上传</h3>
-                </div>
-                <span id="uploadCompanyBadge">当前公司：示例科技</span>
-              </div>
-
-              <label class="upload-zone" id="payrollDropZone" for="payrollFile">
-                <input id="payrollFile" type="file" accept=".xls,.xlsx,.csv">
-                <span class="upload-icon" aria-hidden="true">XLS</span>
-                <strong>选择工资单Excel</strong>
-                <small id="uploadFileName">未选择文件</small>
-              </label>
-
-              <div class="import-summary" aria-live="polite">
-                <div>
-                  <span>读取员工</span>
-                  <strong id="importRows">0 人</strong>
-                </div>
-                <div>
-                  <span>人工成本</span>
-                  <strong id="importCost">¥ 0</strong>
-                </div>
-                <div>
-                  <span>社保公积金</span>
-                  <strong id="importSocialFund">¥ 0</strong>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="payroll-preview">
-            <div class="section-title-row">
-              <div>
-                <p class="eyebrow">导入预览</p>
-                <h3>员工薪资及社保</h3>
-              </div>
-              <span id="importStatus">等待上传</span>
-            </div>
-            <div class="table-wrap payroll-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>员工</th>
-                    <th>应发工资</th>
-                    <th>实发工资</th>
-                    <th>个税</th>
-                    <th>个人社保</th>
-                    <th>公司社保</th>
-                    <th>公积金合计</th>
-                    <th>公司人工成本</th>
-                  </tr>
-                </thead>
-                <tbody id="payrollPreviewBody">
-                  <tr>
-                    <td colspan="8">暂无导入数据</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel span-12 property-workspace" id="property" aria-labelledby="property-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">物业费用</p>
-              <h2 id="property-title">每月物业统计</h2>
-            </div>
-            <div class="property-actions">
-              <button class="ghost-button" type="button">导出月报</button>
-              <button class="primary-button" type="button">新增费用</button>
-            </div>
-          </div>
-
-          <div class="property-overview" aria-label="物业费用总览">
-            <article>
-              <span>本月物业合计</span>
-              <strong id="propertyMonthlyTotal">¥ 28,200</strong>
-            </article>
-            <article>
-              <span>当前公司</span>
-              <strong id="propertyCompanyTotal">¥ 18,600</strong>
-            </article>
-            <article>
-              <span>费用项目</span>
-              <strong id="propertyItemCount">4 项</strong>
-            </article>
-            <article>
-              <span>主要费用</span>
-              <strong id="propertyMainType">房租 ¥ 12,000</strong>
-            </article>
-          </div>
-
-          <div class="property-layout">
-            <section class="property-company-panel" aria-labelledby="property-company-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">各公司情况</p>
-                  <h3 id="property-company-title">每家公司物业所属费用</h3>
-                </div>
-                <span id="selectedPropertyCompanyBadge">示例科技</span>
-              </div>
-
-              <div class="property-company-grid">
-                <button class="property-company-card selected" type="button" data-company="tech">
-                  <span>示例科技</span>
-                  <strong>¥ 18,600</strong>
-                  <small>总部办公室 · 房租/物业/水电/停车</small>
-                </button>
-                <button class="property-company-card" type="button" data-company="trade">
-                  <span>示例贸易</span>
-                  <strong>¥ 7,200</strong>
-                  <small>贸易仓库 · 房租/物业/水电/维修</small>
-                </button>
-                <button class="property-company-card" type="button" data-company="holding">
-                  <span>控股主体</span>
-                  <strong>¥ 2,400</strong>
-                  <small>控股办公室 · 停车/水电/维修</small>
-                </button>
-              </div>
-            </section>
-
-            <section class="property-breakdown-panel" aria-labelledby="property-breakdown-title">
-              <div class="section-title-row">
-                <div>
-                  <p class="eyebrow">费用分类</p>
-                  <h3 id="property-breakdown-title">当前公司费用结构</h3>
-                </div>
-              </div>
-              <div class="property-category-list" id="propertyCategoryList"></div>
-            </section>
-          </div>
-
-          <div class="property-detail-grid">
-            <section class="property-table-panel" aria-labelledby="property-company-table-title">
-              <div class="section-title-row compact">
-                <div>
-                  <p class="eyebrow">月度汇总</p>
-                  <h3 id="property-company-table-title">各公司物业费用</h3>
-                </div>
-              </div>
-              <div class="table-wrap property-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>公司</th>
-                      <th>物业所属</th>
-                      <th>费用类型</th>
-                      <th>项目数</th>
-                      <th>本月费用</th>
-                    </tr>
-                  </thead>
-                  <tbody id="propertyCompanyBody"></tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="property-table-panel" aria-labelledby="property-detail-title">
-              <div class="section-title-row compact">
-                <div>
-                  <p class="eyebrow">明细</p>
-                  <h3 id="property-detail-title">当前公司物业费用明细</h3>
-                </div>
-              </div>
-              <div class="table-wrap property-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>月份</th>
-                      <th>公司</th>
-                      <th>物业所属</th>
-                      <th>费用类型</th>
-                      <th>收款方</th>
-                      <th>金额</th>
-                    </tr>
-                  </thead>
-                  <tbody id="propertyDetailBody"></tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section class="panel span-6" aria-labelledby="table-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">公司汇总</p>
-              <h2 id="table-title">本月经营表</h2>
-            </div>
-            <button class="ghost-button" type="button">导出</button>
-          </div>
-          <div class="table-wrap">
+          <div class="table-wrap dashboard-table">
             <table>
               <thead>
                 <tr>
                   <th>公司</th>
-                  <th>资金余额</th>
-                  <th>收入</th>
-                  <th>人工成本</th>
-                  <th>净利润</th>
+                  <th>今日收入</th>
+                  <th>今日支出</th>
+                  <th>净现金流</th>
+                  <th>盈利状态</th>
+                  <th>备注</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="companyStatusBody">
                 <tr>
                   <td>示例科技</td>
-                  <td>¥ 1,284,600</td>
-                  <td>¥ 486,000</td>
-                  <td>¥ 78,450</td>
-                  <td class="positive">¥ 126,800</td>
+                  <td>¥ 68,000</td>
+                  <td>¥ 35,400</td>
+                  <td class="positive">¥ 32,600</td>
+                  <td><span class="status-pill good">盈利</span></td>
+                  <td>销售回款覆盖当日支出</td>
                 </tr>
                 <tr>
                   <td>示例贸易</td>
-                  <td>¥ 684,200</td>
-                  <td>¥ 312,000</td>
-                  <td>¥ 54,800</td>
-                  <td class="positive">¥ 62,400</td>
+                  <td>¥ 38,200</td>
+                  <td>¥ 26,300</td>
+                  <td class="positive">¥ 11,900</td>
+                  <td><span class="status-pill good">盈利</span></td>
+                  <td>仓储费用稳定</td>
                 </tr>
                 <tr>
                   <td>控股主体</td>
-                  <td>¥ 2,108,900</td>
-                  <td>¥ 138,000</td>
-                  <td>¥ 43,600</td>
-                  <td class="positive">¥ 29,200</td>
+                  <td>¥ 20,600</td>
+                  <td>¥ 16,750</td>
+                  <td class="positive">¥ 3,850</td>
+                  <td><span class="status-pill steady">平稳</span></td>
+                  <td>管理支出正常</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section class="panel span-12 dashboard-panel" aria-labelledby="quick-links-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">数据维护</p>
+              <h2 id="quick-links-title">进入独立页面上传数据</h2>
+            </div>
+          </div>
+          <div class="quick-link-grid">
+            <a href="capital.html">
+              <span>资金表</span>
+              <strong>上传银行流水和资金表</strong>
+            </a>
+            <a href="payroll.html">
+              <span>工资社保</span>
+              <strong>上传工资单、个税、社保</strong>
+            </a>
+            <a href="property.html">
+              <span>物业费用</span>
+              <strong>上传房租、物业、水电</strong>
+            </a>
           </div>
         </section>
       </section>

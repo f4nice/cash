@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>资金表 - 财神爷</title>
+  <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="公司导航">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><img src="assets/logo-caishenye.svg" alt=""></div>
+        <div><strong>财神爷</strong><span>多公司财务管理</span></div>
+      </div>
+      <nav class="nav-list" aria-label="主导航">
+        <a class="nav-item" href="index.html"><span class="nav-icon">01</span><span>总览</span></a>
+        <a class="nav-item active" href="capital.html"><span class="nav-icon">02</span><span>资金表</span></a>
+        <a class="nav-item" href="payroll.html"><span class="nav-icon">03</span><span>工资社保</span></a>
+        <a class="nav-item" href="property.html"><span class="nav-icon">04</span><span>物业费用</span></a>
+      </nav>
+      <section class="company-panel" aria-labelledby="company-title-capital">
+        <h2 id="company-title-capital">公司</h2>
+        <button class="company-row selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 1,284,600</strong></button>
+        <button class="company-row" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 684,200</strong></button>
+        <button class="company-row" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,108,900</strong></button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">资金数据维护</p>
+          <h1>资金表</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
+          <button class="primary-button" type="button" data-open-capital-file>上传Excel</button>
+        </div>
+      </header>
+
+      <section class="content-grid">
+        <section class="panel span-12 capital-workspace" id="capital" aria-labelledby="capital-title">
+          <div class="panel-header">
+            <div><p class="eyebrow">资金表</p><h2 id="capital-title">公司资金表工作台</h2></div>
+          </div>
+          <div class="capital-overview" aria-label="资金总览">
+            <article><span>全部资金</span><strong>¥ 4,077,700</strong></article>
+            <article><span>银行账户</span><strong id="capitalAccountCount">7 个</strong></article>
+            <article><span>本月流入</span><strong id="capitalMonthlyIn">¥ 936,000</strong></article>
+            <article><span>本月流出</span><strong id="capitalMonthlyOut">¥ 717,600</strong></article>
+          </div>
+          <div class="capital-layout">
+            <section class="capital-companies" aria-labelledby="capital-company-title">
+              <div class="section-title-row">
+                <div><p class="eyebrow">所有资金</p><h3 id="capital-company-title">按公司和银行查看</h3></div>
+                <span id="selectedCapitalCompanyBadge">示例科技</span>
+              </div>
+              <div class="capital-company-grid">
+                <button class="capital-company-card selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 1,284,600</strong><small>招商银行、建设银行、支付宝</small></button>
+                <button class="capital-company-card" type="button" data-company="trade"><span>示例贸易</span><strong>¥ 684,200</strong><small>工商银行、微信</small></button>
+                <button class="capital-company-card" type="button" data-company="holding"><span>控股主体</span><strong>¥ 2,108,900</strong><small>中国银行、证券账户</small></button>
+              </div>
+              <div class="bank-account-panel">
+                <div class="section-title-row compact">
+                  <div><p class="eyebrow">所属银行</p><h3>选择提交账户</h3></div>
+                  <span id="selectedBankBadge">招商银行 基本户</span>
+                </div>
+                <div class="bank-account-list" id="bankAccountList"></div>
+              </div>
+            </section>
+            <section class="capital-upload" id="capital-upload" aria-labelledby="capital-upload-title">
+              <div class="section-title-row">
+                <div><p class="eyebrow">Excel导入</p><h3 id="capital-upload-title">银行资金表上传</h3></div>
+                <span id="capitalUploadCompanyBadge">当前公司：示例科技</span>
+              </div>
+              <label class="upload-zone" for="capitalFile">
+                <input id="capitalFile" type="file" accept=".xls,.xlsx,.csv">
+                <span class="upload-icon" aria-hidden="true">BANK</span>
+                <strong>选择银行流水或资金表</strong>
+                <small id="capitalUploadFileName">未选择文件</small>
+              </label>
+              <div class="import-summary capital-import-summary" aria-live="polite">
+                <div><span>读取流水</span><strong id="capitalImportRows">0 笔</strong></div>
+                <div><span>流入</span><strong id="capitalImportIn">¥ 0</strong></div>
+                <div><span>流出</span><strong id="capitalImportOut">¥ 0</strong></div>
+                <div><span>净现金流</span><strong id="capitalImportNet">¥ 0</strong></div>
+              </div>
+            </section>
+          </div>
+          <div class="capital-detail-grid">
+            <section class="capital-chart-card">
+              <div class="section-title-row compact">
+                <div><p class="eyebrow">资金趋势</p><h3>公司资金走势</h3></div>
+              </div>
+              <div class="cash-chart" aria-label="资金走势图">
+                <div class="bar" style="--height: 42%"><span>1月</span></div>
+                <div class="bar" style="--height: 55%"><span>2月</span></div>
+                <div class="bar" style="--height: 48%"><span>3月</span></div>
+                <div class="bar" style="--height: 62%"><span>4月</span></div>
+                <div class="bar" style="--height: 74%"><span>5月</span></div>
+                <div class="bar accent" style="--height: 88%"><span>6月</span></div>
+              </div>
+            </section>
+            <section class="capital-cashflow-card">
+              <div class="section-title-row compact">
+                <div><p class="eyebrow">现金流表</p><h3>公司现金流汇总</h3></div>
+                <span id="capitalImportStatus">等待上传</span>
+              </div>
+              <div class="table-wrap cashflow-table-wrap">
+                <table>
+                  <thead><tr><th>日期</th><th>公司</th><th>银行账户</th><th>摘要</th><th>流入</th><th>流出</th><th>净现金流</th><th>余额</th></tr></thead>
+                  <tbody id="cashFlowBody">
+                    <tr><td>2026-06</td><td>示例科技</td><td>招商银行 基本户</td><td>经营收支</td><td>¥ 486,000</td><td>¥ 281,400</td><td class="positive">¥ 204,600</td><td>¥ 1,284,600</td></tr>
+                    <tr><td>2026-06</td><td>示例贸易</td><td>工商银行 基本户</td><td>经营收支</td><td>¥ 312,000</td><td>¥ 249,600</td><td class="positive">¥ 62,400</td><td>¥ 684,200</td></tr>
+                    <tr><td>2026-06</td><td>控股主体</td><td>中国银行 一般户</td><td>投资及管理</td><td>¥ 138,000</td><td>¥ 108,800</td><td class="positive">¥ 29,200</td><td>¥ 2,108,900</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+          <div class="capital-preview">
+            <div class="section-title-row compact">
+              <div><p class="eyebrow">导入预览</p><h3>银行流水明细</h3></div>
+              <span id="capitalUploadBankBadge">当前银行：招商银行 基本户</span>
+            </div>
+            <div class="table-wrap cashflow-table-wrap">
+              <table>
+                <thead><tr><th>日期</th><th>银行</th><th>账户</th><th>摘要</th><th>对方户名</th><th>流入</th><th>流出</th><th>余额</th></tr></thead>
+                <tbody id="capitalPreviewBody"><tr><td colspan="8">暂无导入数据</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

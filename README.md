@@ -6,10 +6,39 @@
 
 - `schema.sql`：MySQL 初始化脚本，包含表、索引、外键和汇总视图。
 - `examples.sql`：常用录入和查询示例。
-- `index.html`：网站首页和财务驾驶舱界面。
-- `styles.css`：首页样式。
-- `app.js`：资金表、工资单和物业费的公司选择、Excel/CSV 读取、现金流、薪资社保和物业月度汇总预览。
+- `server.py`：8001 端口的 Python 后端，同时提供静态页面和 MySQL 写入接口。
+- `index.html`：网站首页，只展示今日收入、今日支出和各公司盈利状态。
+- `capital.html`：资金表独立页面，选择公司和银行后上传银行流水。
+- `payroll.html`：工资社保独立页面，选择公司和月份后上传工资单。
+- `property.html`：物业费用独立页面，选择公司和月份后上传物业、房租、水电等费用。
+- `styles.css`：页面样式。
+- `app.js`：公司选择、Excel/CSV 读取、上传预览和 `/api/import/*` 入库调用。
 - `assets/logo-caishenye.svg`：财神爷品牌 logo 和网站图标。
+
+## 运行方式
+
+页面和接口使用同一个端口：
+
+```powershell
+python server.py
+```
+
+服务默认监听 `0.0.0.0:8001`，需要通过环境变量连接 MySQL：
+
+```powershell
+$env:MYSQL_HOST="127.0.0.1"
+$env:MYSQL_USER="caishenye_app"
+$env:MYSQL_PASSWORD="你的数据库密码"
+$env:MYSQL_DATABASE="caishenye"
+python server.py
+```
+
+上传接口：
+
+- `POST /api/import/capital`：写入 `cash_transactions`，如表格含余额则同步写入 `capital_snapshots`。
+- `POST /api/import/payroll`：写入 `payroll_import_batches`、`payroll_records`，并生成工资、个税、社保、公积金支出流水。
+- `POST /api/import/property`：写入 `property_expenses`，并同步生成物业相关支出流水。
+- `GET /api/overview`：首页读取今日收入、今日支出和各公司净现金流。
 
 ## 导入方式
 
