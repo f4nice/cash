@@ -769,6 +769,27 @@ td {
   font-weight: 700;
 }
 
+.upload-company-select {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.upload-company-select select {
+  min-height: 38px;
+  padding: 0 34px 0 10px;
+  border: 1px solid rgba(15, 143, 122, 0.28);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .upload-button-row {
   display: flex;
   gap: 8px;

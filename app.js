@@ -476,8 +476,14 @@
       node.classList.toggle("selected", node.dataset.company === companyKey);
     });
 
+    const payrollCompanySelect = document.getElementById("payrollCompanySelect");
+    if (payrollCompanySelect) payrollCompanySelect.value = companyKey;
+    if (pendingPayrollImport) {
+      pendingPayrollImport = null;
+      setPayrollSaveButton(false, "保存");
+    }
+
     setText("selectedCompanyBadge", company.name);
-    setText("uploadCompanyBadge", `当前公司：${company.name}`);
     setText("selectedCapitalCompanyBadge", company.name);
     setText("capitalUploadCompanyBadge", `当前公司：${company.name}`);
     setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
@@ -932,6 +938,10 @@
   function bindEvents() {
     document.querySelectorAll("[data-company]").forEach((node) => {
       node.addEventListener("click", () => updateCompany(node.dataset.company));
+    });
+
+    document.getElementById("payrollCompanySelect")?.addEventListener("change", (event) => {
+      updateCompany(event.target.value);
     });
 
     document.querySelectorAll("[data-scroll-target]").forEach((node) => {

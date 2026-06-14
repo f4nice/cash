@@ -54,7 +54,14 @@
               <div class="section-title-row">
                 <div><p class="eyebrow">Excel导入</p><h3 id="payroll-upload-title">工资单上传</h3></div>
                 <div class="upload-card-actions">
-                  <span id="uploadCompanyBadge">当前公司：示例科技</span>
+                  <label class="upload-company-select" for="payrollCompanySelect">
+                    <span>上传公司</span>
+                    <select id="payrollCompanySelect" aria-label="选择工资单所属公司">
+                      <option value="tech">示例科技</option>
+                      <option value="trade">示例贸易</option>
+                      <option value="holding">控股主体</option>
+                    </select>
+                  </label>
                   <div class="upload-button-row">
                     <button class="ghost-button" type="button" id="downloadTemplate">下载模板</button>
                     <label class="primary-button file-action" for="payrollFile" role="button" tabindex="0">上传Excel</label>
