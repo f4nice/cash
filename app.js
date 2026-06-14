@@ -79,7 +79,8 @@
 
   const state = {
     selectedCompany: "tech",
-    selectedAccount: "tech-cmb-basic"
+    selectedAccount: "tech-cmb-basic",
+    capitalAsOfDate: ""
   };
 
   function buildCompanyCodeToKey() {
@@ -271,6 +272,16 @@
     const account = getSelectedAccount();
     if (!company || !account) return "等待上传";
     return `明细归属：${company.name} / ${account.bank} ${account.accountName}`;
+  }
+
+  function selectedCapitalDate() {
+    return document.getElementById("capitalAsOfDate")?.value || state.capitalAsOfDate || "";
+  }
+
+  function setCapitalDateValue(value) {
+    state.capitalAsOfDate = value || "";
+    const input = document.getElementById("capitalAsOfDate");
+    if (input && input.value !== state.capitalAsOfDate) input.value = state.capitalAsOfDate;
   }
 
   async function postJson(url, payload) {
@@ -1139,10 +1150,19 @@
     });
   }
 
+  function renderCapitalTotals() {
+    if (!document.getElementById("capitalTotalFunds")) return;
+    const totalFunds = companyEntries().reduce((sum, [, company]) => sum + Number(company.funds || 0), 0);
+    const accountCount = companyEntries().reduce((sum, [, company]) => sum + company.bankAccounts.length, 0);
+    setText("capitalTotalFunds", formatMoney(totalFunds));
+    setText("capitalAccountCount", `${accountCount} 个`);
+  }
+
   function renderCompanySurfaces() {
     renderSidebarCompanies();
     renderPayrollCompanyOptions();
     renderBaseCompanyCards();
+    renderCapitalTotals();
   }
 
   function syncCompanySelection() {
@@ -1240,15 +1260,36 @@
 
   async function loadCompanies() {
     try {
-      const response = await fetch("/api/companies");
+      const asOf = selectedCapitalDate();
+      const url = asOf ? `/api/companies?asOf=${encodeURIComponent(asOf)}` : "/api/companies";
+      const response = await fetch(url);
       if (!response.ok) throw new Error("companies unavailable");
       const data = await response.json();
+      if (data.asOf) setCapitalDateValue(data.asOf);
+      if (Object.prototype.hasOwnProperty.call(data, "monthlyIncome")) {
+        setText("capitalMonthlyIn", formatMoney(data.monthlyIncome));
+      }
+      if (Object.prototype.hasOwnProperty.call(data, "monthlyExpense")) {
+        setText("capitalMonthlyOut", formatMoney(data.monthlyExpense));
+      }
       replaceCompanyData(data.companies || []);
     } catch (error) {
       companyCodeToKey = buildCompanyCodeToKey();
     }
     renderCompanySurfaces();
     updateCompany(state.selectedCompany);
+  }
+
+  async function handleCapitalDateChange() {
+    setCapitalDateValue(selectedCapitalDate());
+    if (pendingCapitalImport) hideCapitalPreview(selectedCapitalAccountStatus());
+    await loadCompanies();
+  }
+
+  async function showLatestCapitalDate() {
+    setCapitalDateValue("");
+    if (pendingCapitalImport) hideCapitalPreview(selectedCapitalAccountStatus());
+    await loadCompanies();
   }
 
   function updateCompany(companyKey) {
@@ -1659,6 +1700,7 @@
       setText("capitalImportStatus", mode === "matrix"
         ? `多公司资金表 · 已写入MySQL ${result.inserted} 条余额`
         : `${payload.company.name} · 已写入MySQL ${result.inserted} 笔`);
+      setCapitalDateValue("");
       await loadCompanies();
       await loadOverview();
     } catch (error) {
@@ -2133,6 +2175,9 @@
     document.getElementById("payrollCompanySelect")?.addEventListener("change", (event) => {
       updateCompany(event.target.value);
     });
+
+    document.getElementById("capitalAsOfDate")?.addEventListener("change", handleCapitalDateChange);
+    document.getElementById("capitalLatestDate")?.addEventListener("click", showLatestCapitalDate);
 
     document.querySelectorAll("[data-scroll-target]").forEach((node) => {
       node.addEventListener("click", () => {

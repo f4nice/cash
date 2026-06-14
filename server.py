@@ -432,9 +432,14 @@ def load_overview():
     }
 
 
-def load_companies():
+def load_companies(as_of_value=""):
+    as_of = parse_day(as_of_value, None) if as_of_value else None
     with get_db() as conn:
         with conn.cursor() as cur:
+            if as_of is None:
+                cur.execute("SELECT MAX(snapshot_date) AS latest_date FROM capital_snapshots")
+                as_of = (cur.fetchone() or {}).get("latest_date") or date.today()
+            period, start_day, end_day = month_bounds(as_of.strftime("%Y-%m"))
             cur.execute(
                 """
                 SELECT
@@ -453,6 +458,7 @@ def load_companies():
                       account_id,
                       SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
                     FROM cash_transactions
+                    WHERE txn_date <= %s
                     GROUP BY account_id
                   ) txn ON txn.account_id = a.id
                   LEFT JOIN (
@@ -461,6 +467,7 @@ def load_companies():
                     JOIN (
                       SELECT account_id, MAX(snapshot_date) AS snapshot_date
                       FROM capital_snapshots
+                      WHERE snapshot_date <= %s
                       GROUP BY account_id
                     ) latest
                       ON latest.account_id = s.account_id
@@ -472,6 +479,8 @@ def load_companies():
                 WHERE c.status = 'active'
                 ORDER BY c.id
                 """
+                ,
+                (as_of, as_of),
             )
             company_rows = cur.fetchall()
             cur.execute(
@@ -489,6 +498,7 @@ def load_companies():
                     account_id,
                     SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
                   FROM cash_transactions
+                  WHERE txn_date <= %s
                   GROUP BY account_id
                 ) txn ON txn.account_id = a.id
                 LEFT JOIN (
@@ -497,6 +507,7 @@ def load_companies():
                   JOIN (
                     SELECT account_id, MAX(snapshot_date) AS snapshot_date
                     FROM capital_snapshots
+                    WHERE snapshot_date <= %s
                     GROUP BY account_id
                   ) latest
                     ON latest.account_id = s.account_id
@@ -505,8 +516,21 @@ def load_companies():
                 WHERE a.status = 'active'
                 ORDER BY a.company_id, a.id
                 """
+                ,
+                (as_of, as_of),
             )
             account_rows = cur.fetchall()
+            cur.execute(
+                """
+                SELECT
+                  COALESCE(SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0) AS income,
+                  COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0) AS expense
+                FROM cash_transactions
+                WHERE txn_date BETWEEN %s AND %s
+                """,
+                (start_day, end_day),
+            )
+            monthly = cur.fetchone() or {}
 
     accounts_by_company = {}
     for row in account_rows:
@@ -519,6 +543,9 @@ def load_companies():
             }
         )
     return {
+        "asOf": as_of.isoformat(),
+        "monthlyIncome": monthly.get("income") or Decimal("0"),
+        "monthlyExpense": monthly.get("expense") or Decimal("0"),
         "companies": [
             {
                 "code": row["company_code"],
@@ -1349,7 +1376,7 @@ class Handler(SimpleHTTPRequestHandler):
         if method == "GET" and path == "/api/overview":
             return load_overview()
         if method == "GET" and path == "/api/companies":
-            return load_companies()
+            return load_companies((query.get("asOf") or [""])[0])
         if method == "GET" and path == "/api/payroll/summary":
             return load_payroll_summary((query.get("period") or [""])[0])
         if method == "GET" and path == "/api/payroll/salary-details":

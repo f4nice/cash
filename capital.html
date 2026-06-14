@@ -55,9 +55,13 @@
         <section class="panel span-12 capital-workspace" id="capital" aria-labelledby="capital-title">
           <div class="panel-header">
             <div><p class="eyebrow">资金表</p><h2 id="capital-title">公司资金表工作台</h2></div>
+            <div class="capital-date-control">
+              <label for="capitalAsOfDate"><span>资金日期</span><input id="capitalAsOfDate" type="date"></label>
+              <button class="ghost-button" type="button" id="capitalLatestDate">最新</button>
+            </div>
           </div>
           <div class="capital-overview" aria-label="资金总览">
-            <article><span>全部资金</span><strong>¥ 4,077,700</strong></article>
+            <article><span>全部资金</span><strong id="capitalTotalFunds">¥ 4,077,700</strong></article>
             <article><span>银行账户</span><strong id="capitalAccountCount">7 个</strong></article>
             <article><span>本月流入</span><strong id="capitalMonthlyIn">¥ 936,000</strong></article>
             <article><span>本月流出</span><strong id="capitalMonthlyOut">¥ 717,600</strong></article>
