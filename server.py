@@ -102,9 +102,15 @@ def parse_day(value, fallback=None):
         return value.date()
     if isinstance(value, date):
         return value
+    if isinstance(value, (int, float, Decimal)) and 20000 <= float(value) <= 80000:
+        return (datetime(1899, 12, 30) + timedelta(days=float(value))).date()
     text = str(value or "").strip()
     if not text:
         return fallback or date.today()
+    if re.fullmatch(r"\d+(\.\d+)?", text):
+        number = float(text)
+        if 20000 <= number <= 80000:
+            return (datetime(1899, 12, 30) + timedelta(days=number)).date()
     text = text.replace("年", "-").replace("月", "-").replace("日", "")
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y-%m", "%Y/%m"):
         try:
@@ -159,8 +165,41 @@ def fetch_one(cur, sql, args):
 
 
 def ensure_company(cur, code, name, update_name=True):
-    code = str(code or "").strip() or "A001"
+    code = str(code or "").strip()
     name = str(name or code).strip()
+    if not code:
+        if name:
+            row = fetch_one(
+                cur,
+                "SELECT id, company_code, company_name FROM companies WHERE company_name = %s AND status = 'active' LIMIT 1",
+                (name,),
+            )
+            if row:
+                return row
+            row = fetch_one(
+                cur,
+                "SELECT id, company_code, company_name FROM companies WHERE company_name LIKE %s AND status = 'active' ORDER BY id LIMIT 1",
+                (f"%{name}%",),
+            )
+            if row:
+                return row
+        code = next_company_code(cur)
+        name = name or code
+    elif code.startswith("AUTO") and name:
+        row = fetch_one(
+            cur,
+            "SELECT id, company_code, company_name FROM companies WHERE company_name = %s AND status = 'active' LIMIT 1",
+            (name,),
+        )
+        if row:
+            return row
+        row = fetch_one(
+            cur,
+            "SELECT id, company_code, company_name FROM companies WHERE company_name LIKE %s AND status = 'active' ORDER BY id LIMIT 1",
+            (f"%{name}%",),
+        )
+        if row:
+            return row
     if update_name:
         cur.execute(
             """
@@ -339,21 +378,34 @@ def load_companies():
                   c.id,
                   c.company_code,
                   c.company_name,
-                  COALESCE(opening.total_opening, 0) + COALESCE(txn.net_amount, 0) AS funds
+                  COALESCE(balance.total_balance, 0) AS funds
                 FROM companies c
                 LEFT JOIN (
-                  SELECT company_id, SUM(opening_balance) AS total_opening
-                  FROM bank_accounts
-                  WHERE status = 'active'
-                  GROUP BY company_id
-                ) opening ON opening.company_id = c.id
-                LEFT JOIN (
                   SELECT
-                    company_id,
-                    SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
-                  FROM cash_transactions
-                  GROUP BY company_id
-                ) txn ON txn.company_id = c.id
+                    a.company_id,
+                    SUM(COALESCE(snapshot.balance, a.opening_balance + COALESCE(txn.net_amount, 0))) AS total_balance
+                  FROM bank_accounts a
+                  LEFT JOIN (
+                    SELECT
+                      account_id,
+                      SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) AS net_amount
+                    FROM cash_transactions
+                    GROUP BY account_id
+                  ) txn ON txn.account_id = a.id
+                  LEFT JOIN (
+                    SELECT s.account_id, s.balance
+                    FROM capital_snapshots s
+                    JOIN (
+                      SELECT account_id, MAX(snapshot_date) AS snapshot_date
+                      FROM capital_snapshots
+                      GROUP BY account_id
+                    ) latest
+                      ON latest.account_id = s.account_id
+                     AND latest.snapshot_date = s.snapshot_date
+                  ) snapshot ON snapshot.account_id = a.id
+                  WHERE a.status = 'active'
+                  GROUP BY a.company_id
+                ) balance ON balance.company_id = c.id
                 WHERE c.status = 'active'
                 ORDER BY c.id
                 """
@@ -367,7 +419,7 @@ def load_companies():
                   a.account_no,
                   a.bank_name,
                   a.account_name,
-                  a.opening_balance + COALESCE(txn.net_amount, 0) AS balance
+                  COALESCE(snapshot.balance, a.opening_balance + COALESCE(txn.net_amount, 0)) AS balance
                 FROM bank_accounts a
                 LEFT JOIN (
                   SELECT
@@ -376,6 +428,17 @@ def load_companies():
                   FROM cash_transactions
                   GROUP BY account_id
                 ) txn ON txn.account_id = a.id
+                LEFT JOIN (
+                  SELECT s.account_id, s.balance
+                  FROM capital_snapshots s
+                  JOIN (
+                    SELECT account_id, MAX(snapshot_date) AS snapshot_date
+                    FROM capital_snapshots
+                    GROUP BY account_id
+                  ) latest
+                    ON latest.account_id = s.account_id
+                   AND latest.snapshot_date = s.snapshot_date
+                ) snapshot ON snapshot.account_id = a.id
                 WHERE a.status = 'active'
                 ORDER BY a.company_id, a.id
                 """
@@ -880,16 +943,46 @@ def import_capital(payload):
     total_out = Decimal("0")
     with get_db() as conn:
         with conn.cursor() as cur:
-            company = ensure_company(cur, company_payload.get("code"), company_payload.get("name"))
-            account = ensure_account(
-                cur,
-                company["id"],
-                account_payload.get("bank"),
-                account_payload.get("accountName"),
-                account_payload.get("key"),
-            )
+            company_cache = {}
+            account_cache = {}
+
+            def row_company(row):
+                code = row.get("companyCode") or company_payload.get("code")
+                name = row.get("company") or company_payload.get("name")
+                cache_key = f"{code or ''}|{name or ''}"
+                if cache_key not in company_cache:
+                    company_cache[cache_key] = ensure_company(cur, code, name)
+                return company_cache[cache_key]
+
+            def row_account(row, company):
+                bank = row.get("bank") or account_payload.get("bank")
+                account_name = row.get("account") or account_payload.get("accountName")
+                account_key = row.get("accountKey") or account_payload.get("key")
+                cache_key = f"{company['id']}|{bank or ''}|{account_name or ''}|{account_key or ''}"
+                if cache_key not in account_cache:
+                    account_cache[cache_key] = ensure_account(cur, company["id"], bank, account_name, account_key)
+                return account_cache[cache_key]
+
             for index, row in enumerate(rows, start=1):
+                company = row_company(row)
+                account = row_account(row, company)
                 txn_date = parse_day(row.get("date"))
+                if row.get("mode") == "snapshot":
+                    balance_raw = row.get("balance")
+                    if balance_raw is None or str(balance_raw).strip() == "":
+                        continue
+                    balance = parse_amount(balance_raw)
+                    cur.execute(
+                        """
+                        INSERT INTO capital_snapshots (company_id, account_id, snapshot_date, balance, remark)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE balance = VALUES(balance), remark = VALUES(remark)
+                        """,
+                        (company["id"], account["id"], txn_date, balance, f"导入：{import_no} {row.get('summary') or ''}".strip()),
+                    )
+                    inserted += 1
+                    continue
+
                 category = str(row.get("summary") or "银行流水").strip()
                 counterparty = str(row.get("counterparty") or "").strip()
                 description = str(row.get("summary") or "").strip()
@@ -900,8 +993,9 @@ def import_capital(payload):
                 inserted += insert_cash(cur, company["id"], account["id"], txn_date, "out", category, expense, counterparty, description, doc_no)
                 total_in += income
                 total_out += expense
-                balance = parse_amount(row.get("balance"))
-                if balance:
+                balance_raw = row.get("balance")
+                if balance_raw is not None and str(balance_raw).strip() != "":
+                    balance = parse_amount(balance_raw)
                     cur.execute(
                         """
                         INSERT INTO capital_snapshots (company_id, account_id, snapshot_date, balance, remark)

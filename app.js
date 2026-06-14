@@ -150,6 +150,28 @@
     balance: ["余额", "账户余额", "balance"]
   };
 
+  const capitalBankSuffixes = [
+    ["建设银行", "建设银行"],
+    ["招商银行", "招商银行"],
+    ["江苏银行", "江苏银行"],
+    ["交通银行", "交通银行"],
+    ["兴业银行", "兴业银行"],
+    ["工商银行", "工商银行"],
+    ["农业银行", "农业银行"],
+    ["中国银行", "中国银行"],
+    ["建行", "建设银行"],
+    ["招行", "招商银行"],
+    ["江苏", "江苏银行"],
+    ["交行", "交通银行"],
+    ["兴业", "兴业银行"],
+    ["工行", "工商银行"],
+    ["农行", "农业银行"],
+    ["中行", "中国银行"],
+    ["支付宝", "支付宝"],
+    ["微信", "微信支付"],
+    ["证券", "证券账户"]
+  ];
+
   const propertyFieldAliases = {
     period: ["月份", "期间", "账期", "费用月份", "period", "month"],
     date: ["日期", "费用日期", "付款日期", "date", "expense_date"],
@@ -444,16 +466,125 @@
     });
   }
 
+  function hasNumericContent(value) {
+    return /-?\d/.test(String(value ?? ""));
+  }
+
+  function excelSerialDate(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 20000 || number > 80000) return "";
+    const date = new Date(Date.UTC(1899, 11, 30) + number * 86400000);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function capitalDateValue(value) {
+    return excelSerialDate(value) || String(value || "").trim();
+  }
+
+  function stableHash(text) {
+    let hash = 0;
+    String(text || "").split("").forEach((char) => {
+      hash = ((hash << 5) - hash + char.charCodeAt(0)) >>> 0;
+    });
+    return hash.toString(36).toUpperCase();
+  }
+
+  function autoCompanyCode(shortName) {
+    return `AUTO${stableHash(shortName).slice(0, 10)}`;
+  }
+
+  function companyForShortName(shortName) {
+    const normalized = normalizeHeader(shortName);
+    const found = companyEntries().find(([, company]) => normalizeHeader(company.name).includes(normalized));
+    if (!found) return null;
+    return {
+      key: found[0],
+      code: found[1].code,
+      name: found[1].name
+    };
+  }
+
+  function splitCapitalHeader(header) {
+    return String(header || "")
+      .split(/\r?\n/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  function parseCapitalMatrixHeader(header, index) {
+    const parts = splitCapitalHeader(header);
+    const first = parts[0] || `第${index + 1}列`;
+    let companyShort = first;
+    let bankShort = "";
+    let bank = "默认银行";
+
+    for (const [suffix, bankName] of capitalBankSuffixes) {
+      if (first.endsWith(suffix) && first.length > suffix.length) {
+        companyShort = first.slice(0, -suffix.length).trim();
+        bankShort = suffix;
+        bank = bankName;
+        break;
+      }
+    }
+
+    const matched = companyForShortName(companyShort);
+    return {
+      index,
+      header: first,
+      rawHeader: header,
+      companyShort,
+      companyCode: matched?.code || autoCompanyCode(companyShort),
+      companyName: matched?.name || companyShort,
+      bank,
+      accountName: bankShort || parts[1] || "基本户",
+      accountKey: `CAP${stableHash(`${companyShort}-${first}`).slice(0, 18)}`,
+      selected: true
+    };
+  }
+
+  function isCapitalMatrixHeader(header) {
+    const text = String(header || "").trim();
+    return text
+      && !/^(年份|日期|总资金|合计|备注)$/i.test(text.replace(/\s+/g, ""))
+      && !/备注|邮箱|说明/.test(text);
+  }
+
+  function detectCapitalMatrixColumns(rows, headers) {
+    const columnCount = capitalColumnCount(rows);
+    const columns = [];
+    for (let index = 2; index < columnCount; index += 1) {
+      const header = headers[index] || "";
+      if (!isCapitalMatrixHeader(header)) continue;
+      const numericCount = rows.slice(1).filter((row) => hasNumericContent(row[index])).length;
+      if (!numericCount) continue;
+      columns.push({
+        ...parseCapitalMatrixHeader(header, index),
+        numericCount
+      });
+    }
+    return columns;
+  }
+
+  function isCapitalMatrixSheet(rows, detected, headers) {
+    if (rows.length < 2 || capitalColumnCount(rows) < 5) return false;
+    const firstHeaders = headers.slice(0, 3).map((item) => normalizeHeader(item)).join("|");
+    const matrixColumns = detectCapitalMatrixColumns(rows, headers);
+    return matrixColumns.length >= 3 && (firstHeaders.includes("日期") || detected.columns.date === 1);
+  }
+
   function renderCapitalDialogSummary() {
     const summary = document.getElementById("capitalDialogSummary");
     if (!summary || !pendingCapitalImport) return;
     const rowCount = pendingCapitalImport.rows.length;
     const dataRows = Math.max(rowCount - pendingCapitalImport.startIndex, 0);
+    const selectedColumns = (pendingCapitalImport.matrixColumns || []).filter((column) => column.selected).length;
+    const scopeLabel = pendingCapitalImport.mode === "matrix" ? "归档方式" : "当前公司";
+    const scopeValue = pendingCapitalImport.mode === "matrix" ? "按列归到公司" : pendingCapitalImport.company.name;
     summary.innerHTML = `
       <article><span>表格行数</span><strong>${rowCount} 行</strong></article>
       <article><span>表格列数</span><strong>${pendingCapitalImport.columnCount} 列</strong></article>
-      <article><span>数据行</span><strong>${dataRows} 行</strong></article>
-      <article><span>当前公司</span><strong>${escapeHtml(pendingCapitalImport.company.name)}</strong></article>
+      <article><span>${pendingCapitalImport.mode === "matrix" ? "选择资金列" : "数据行"}</span><strong>${pendingCapitalImport.mode === "matrix" ? `${selectedColumns} 列` : `${dataRows} 行`}</strong></article>
+      <article><span>${scopeLabel}</span><strong>${escapeHtml(scopeValue)}</strong></article>
     `;
   }
 
@@ -483,6 +614,72 @@
         ${labels.map((_, index) => `<td>${escapeHtml(row[index] ?? "")}</td>`).join("")}
       </tr>
     `).join("");
+  }
+
+  function setCapitalMatrixVisible(visible) {
+    const panel = document.getElementById("capitalMatrixColumns");
+    if (panel) panel.hidden = !visible;
+  }
+
+  function renderCapitalMatrixColumns() {
+    const list = document.getElementById("capitalMatrixColumnList");
+    if (!list || !pendingCapitalImport) return;
+    const columns = pendingCapitalImport.matrixColumns || [];
+    if (!columns.length) {
+      list.innerHTML = '<div class="matrix-column-empty">没有识别到可导入的资金列</div>';
+      return;
+    }
+    list.innerHTML = columns.map((column) => `
+      <label class="matrix-column-item">
+        <input class="capital-matrix-check" type="checkbox" data-matrix-column="${column.index}" ${column.selected ? "checked" : ""}>
+        <span>
+          <strong>${escapeHtml(column.header)}</strong>
+          <small>${escapeHtml(column.companyName)} · ${escapeHtml(column.bank)} ${escapeHtml(column.accountName)} · ${column.numericCount} 条余额</small>
+        </span>
+      </label>
+    `).join("");
+  }
+
+  function selectedCapitalMatrixColumns() {
+    return (pendingCapitalImport?.matrixColumns || []).filter((column) => column.selected);
+  }
+
+  function updateCapitalMatrixColumnSelection(index, checked) {
+    if (!pendingCapitalImport) return;
+    const column = (pendingCapitalImport.matrixColumns || []).find((item) => item.index === index);
+    if (!column) return;
+    column.selected = checked;
+    renderCapitalDialogSummary();
+    updateCapitalPreviewFromMapping();
+  }
+
+  function mapCapitalMatrixRows() {
+    if (!pendingCapitalImport) return [];
+    const dateColumn = pendingCapitalImport.dateColumn >= 0 ? pendingCapitalImport.dateColumn : 1;
+    const rows = [];
+    pendingCapitalImport.rows.slice(pendingCapitalImport.startIndex).forEach((row) => {
+      const dateValue = capitalDateValue(row[dateColumn]);
+      if (!dateValue) return;
+      selectedCapitalMatrixColumns().forEach((column) => {
+        const rawBalance = row[column.index];
+        if (!hasNumericContent(rawBalance)) return;
+        rows.push({
+          mode: "snapshot",
+          date: dateValue,
+          company: column.companyName,
+          companyCode: column.companyCode,
+          bank: column.bank,
+          account: column.accountName,
+          accountKey: column.accountKey,
+          summary: `${column.header} 余额快照`,
+          counterparty: column.header,
+          income: 0,
+          expense: 0,
+          balance: parseAmount(rawBalance)
+        });
+      });
+    });
+    return rows;
   }
 
   function openCapitalPreviewDialog() {
@@ -520,6 +717,24 @@
 
   function updateCapitalPreviewFromMapping() {
     if (!pendingCapitalImport) return;
+    if (pendingCapitalImport.mode === "matrix") {
+      capitalPreviewRows = mapCapitalMatrixRows();
+      pendingCapitalImport.mappedRows = capitalPreviewRows;
+      const dates = Array.from(new Set(capitalPreviewRows.map((row) => row.date))).sort();
+      const latestDate = dates[dates.length - 1];
+      const latestBalance = capitalPreviewRows
+        .filter((row) => row.date === latestDate)
+        .reduce((sum, row) => sum + row.balance, 0);
+      setText("capitalImportRows", `${capitalPreviewRows.length} 条`);
+      setText("capitalImportIn", formatMoney(0));
+      setText("capitalImportOut", formatMoney(0));
+      setText("capitalImportNet", formatMoney(latestBalance));
+      renderCapitalPreview(capitalPreviewRows);
+      renderCashFlowSummary(capitalPreviewRows);
+      setCapitalSaveButton(capitalPreviewRows.length > 0);
+      return;
+    }
+
     capitalPreviewRows = mapCapitalRows(pendingCapitalImport.rows, {
       columns: selectedCapitalColumns(),
       startIndex: pendingCapitalImport.startIndex
@@ -684,6 +899,7 @@
     pendingCapitalImport = null;
     capitalPreviewRows = [];
     setCapitalMappingVisible(false);
+    setCapitalMatrixVisible(false);
     setCapitalPreviewButtonVisible(false);
     closeCapitalPreviewDialog();
     setCapitalSaveButton(false, "保存导入");
@@ -1252,30 +1468,45 @@
     const detected = mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
     const columnCount = capitalColumnCount(rows);
     const columnLabels = capitalColumnLabels(detected.headers, columnCount);
+    const isMatrix = isCapitalMatrixSheet(rows, detected, detected.headers);
+    const matrixColumns = isMatrix ? detectCapitalMatrixColumns(rows, detected.headers) : [];
     const selectedCompany = companyData[state.selectedCompany];
 
     pendingCapitalImport = {
+      mode: isMatrix ? "matrix" : "flow",
       company: selectedCompanyPayload(),
       account: selectedAccountPayload(),
       fileName: file.name,
       sheetName,
       rows,
       startIndex: detected.startIndex,
+      dateColumn: detected.columns.date >= 0 ? detected.columns.date : 1,
       columnCount,
       columnLabels,
+      matrixColumns,
       mappedRows: []
     };
     renderCapitalDialogSummary();
-    renderCapitalColumnMapping(columnLabels, detected.columns);
+    if (isMatrix) {
+      setCapitalMappingVisible(false);
+      setCapitalMatrixVisible(true);
+      renderCapitalMatrixColumns();
+    } else {
+      setCapitalMatrixVisible(false);
+      renderCapitalColumnMapping(columnLabels, detected.columns);
+    }
     renderCapitalRawPreview();
     updateCapitalPreviewFromMapping();
     setCapitalPreviewButtonVisible(true);
     openCapitalPreviewDialog();
-    setText("capitalImportStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}，请确认列后保存`);
+    setText("capitalImportStatus", isMatrix
+      ? `多公司资金表 · 已识别${matrixColumns.length}列，请确认后保存`
+      : `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}，请确认列后保存`);
   }
 
   async function saveCapitalImport() {
     if (!pendingCapitalImport || !capitalPreviewRows.length) return;
+    const mode = pendingCapitalImport.mode;
     const payload = {
       company: pendingCapitalImport.company,
       account: pendingCapitalImport.account,
@@ -1290,12 +1521,14 @@
       setCapitalSaveButton(false, "已保存");
       setCapitalPreviewButtonVisible(false);
       closeCapitalPreviewDialog();
-      setText("capitalImportStatus", `${payload.company.name} · 已写入MySQL ${result.inserted} 笔`);
+      setText("capitalImportStatus", mode === "matrix"
+        ? `多公司资金表 · 已写入MySQL ${result.inserted} 条余额`
+        : `${payload.company.name} · 已写入MySQL ${result.inserted} 笔`);
       await loadCompanies();
       await loadOverview();
     } catch (error) {
       setCapitalSaveButton(true, "重试保存");
-      setText("capitalImportStatus", `${payload.company.name} · 保存失败，请检查MySQL连接`);
+      setText("capitalImportStatus", `${mode === "matrix" ? "多公司资金表" : payload.company.name} · 保存失败，请检查MySQL连接`);
     }
   }
 
@@ -1862,6 +2095,11 @@
     document.getElementById("capitalColumnMapping")?.addEventListener("change", (event) => {
       if (!event.target.matches("[data-capital-field]")) return;
       updateCapitalPreviewFromMapping();
+    });
+
+    document.getElementById("capitalMatrixColumnList")?.addEventListener("change", (event) => {
+      if (!event.target.classList.contains("capital-matrix-check")) return;
+      updateCapitalMatrixColumnSelection(Number(event.target.dataset.matrixColumn), event.target.checked);
     });
 
     document.getElementById("downloadTemplate")?.addEventListener("click", downloadPayrollTemplate);

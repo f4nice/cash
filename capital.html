@@ -91,10 +91,10 @@
                 <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
               </div>
               <div class="import-summary capital-import-summary" aria-live="polite">
-                <div><span>读取流水</span><strong id="capitalImportRows">0 笔</strong></div>
+                <div><span>读取记录</span><strong id="capitalImportRows">0 笔</strong></div>
                 <div><span>流入</span><strong id="capitalImportIn">¥ 0</strong></div>
                 <div><span>流出</span><strong id="capitalImportOut">¥ 0</strong></div>
-                <div><span>净现金流</span><strong id="capitalImportNet">¥ 0</strong></div>
+                <div><span>余额合计</span><strong id="capitalImportNet">¥ 0</strong></div>
               </div>
             </section>
           </div>
@@ -170,6 +170,13 @@
           <label><span>收支方向</span><select data-capital-field="direction"></select></label>
           <label><span>余额</span><select data-capital-field="balance"></select></label>
         </div>
+      </div>
+      <div class="matrix-column-picker" id="capitalMatrixColumns" hidden>
+        <div class="mapping-header">
+          <div><span>资金列选择</span><strong>勾选要归档的公司资金列</strong></div>
+          <small>系统会按列名自动识别公司和银行账户</small>
+        </div>
+        <div class="matrix-column-list" id="capitalMatrixColumnList"></div>
       </div>
       <div class="table-wrap raw-preview-table-wrap">
         <table>

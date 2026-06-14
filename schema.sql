@@ -288,16 +288,30 @@ SELECT
   a.account_name,
   a.bank_name,
   a.currency,
-  a.opening_balance
-    + COALESCE(SUM(CASE WHEN t.direction = 'in' THEN t.amount ELSE -t.amount END), 0) AS calculated_balance
+  COALESCE(
+    snapshot.balance,
+    a.opening_balance
+      + COALESCE(SUM(CASE WHEN t.direction = 'in' THEN t.amount ELSE -t.amount END), 0)
+  ) AS calculated_balance
 FROM companies c
 JOIN bank_accounts a ON a.company_id = c.id
 LEFT JOIN cash_transactions t ON t.account_id = a.id
+LEFT JOIN (
+  SELECT s.account_id, s.balance
+  FROM capital_snapshots s
+  JOIN (
+    SELECT account_id, MAX(snapshot_date) AS snapshot_date
+    FROM capital_snapshots
+    GROUP BY account_id
+  ) latest
+    ON latest.account_id = s.account_id
+   AND latest.snapshot_date = s.snapshot_date
+) snapshot ON snapshot.account_id = a.id
 WHERE c.status = 'active'
   AND a.status = 'active'
 GROUP BY
   c.id, c.company_code, c.company_name,
-  a.id, a.account_name, a.bank_name, a.currency, a.opening_balance;
+  a.id, a.account_name, a.bank_name, a.currency, a.opening_balance, snapshot.balance;
 
 CREATE OR REPLACE VIEW v_company_cash_total AS
 SELECT
