@@ -358,6 +358,11 @@
     const workbook = await readWorkbook(file, ui.statusId);
     if (!workbook) return;
     showSheetControl(kind, workbook.SheetNames);
+    if (kind === "capital" && workbook.SheetNames.length === 1) {
+      setText(ui.statusId, "已自动读取唯一Sheet");
+      await importSelectedSheet(kind);
+      return;
+    }
     setText(ui.statusId, "请选择Sheet后导入");
   }
 
@@ -1194,7 +1199,7 @@
 
     setText("selectedCompanyBadge", company.name);
     setText("selectedCapitalCompanyBadge", company.name);
-    setText("capitalUploadCompanyBadge", `当前公司：${company.name}`);
+    setText("capitalUploadCompanyBadge", `普通流水归属：${company.name}`);
     setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
     renderBankAccounts();
     renderPropertyStats();

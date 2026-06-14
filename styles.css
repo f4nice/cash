@@ -1422,6 +1422,13 @@ td {
   font-size: 18px;
 }
 
+.upload-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .import-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
