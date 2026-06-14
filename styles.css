@@ -1003,6 +1003,86 @@ td {
   box-shadow: 0 24px 60px rgba(12, 34, 34, 0.2);
 }
 
+.capital-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(8, 20, 20, 0.28);
+}
+
+.capital-preview-backdrop[hidden] {
+  display: none;
+}
+
+.capital-preview-dialog {
+  width: min(1280px, 100%);
+  max-height: 88vh;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 24px 60px rgba(12, 34, 34, 0.22);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.capital-dialog-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.capital-dialog-summary article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.capital-dialog-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.capital-dialog-summary strong {
+  font-size: 19px;
+}
+
+.raw-preview-table-wrap {
+  max-height: 42vh;
+}
+
+.raw-preview-table-wrap table {
+  min-width: 1120px;
+}
+
+.raw-preview-table-wrap th,
+.raw-preview-table-wrap td {
+  white-space: nowrap;
+}
+
+.row-index-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 54px;
+  background: #f7faf9;
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .employee-dialog-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1215,6 +1295,12 @@ td {
 
 .mapping-header strong {
   font-size: 15px;
+}
+
+.mapping-header small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .mapping-grid {
@@ -1518,7 +1604,8 @@ td {
   }
 
   .payroll-period-switcher,
-  .salary-dialog-actions {
+  .salary-dialog-actions,
+  .dialog-actions {
     justify-content: stretch;
   }
 
@@ -1569,6 +1656,7 @@ td {
   .payroll-actions,
   .section-title-row,
   .mapping-header,
+  .dialog-actions,
   .upload-card-actions,
   .upload-button-row {
     align-items: stretch;
@@ -1583,6 +1671,7 @@ td {
   .property-category-list,
   .payroll-company-grid,
   .bank-account-list,
+  .capital-dialog-summary,
   .status-grid,
   .quick-link-grid,
   .sheet-control,

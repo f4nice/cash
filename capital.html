@@ -74,6 +74,7 @@
                 <div class="upload-card-actions">
                   <span id="capitalUploadCompanyBadge">当前公司：示例科技</span>
                   <div class="upload-button-row">
+                    <button class="ghost-button" type="button" id="openCapitalPreviewDialogButton" hidden>查看预览</button>
                     <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
                     <label class="primary-button file-action" for="capitalFile" role="button" tabindex="0">上传Excel</label>
                   </div>
@@ -88,22 +89,6 @@
               <div class="sheet-control" id="capitalSheetControl" hidden>
                 <label for="capitalSheetSelect"><span>选择Sheet</span><select id="capitalSheetSelect"></select></label>
                 <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
-              </div>
-              <div class="column-mapping capital-column-mapping" id="capitalColumnMapping" hidden>
-                <div class="mapping-header">
-                  <div><span>列选择</span><strong>确认Excel列对应关系</strong></div>
-                  <button class="primary-button save-import-button" type="button" id="saveCapitalImport" disabled>保存导入</button>
-                </div>
-                <div class="mapping-grid">
-                  <label><span>日期</span><select data-capital-field="date"></select></label>
-                  <label><span>摘要</span><select data-capital-field="summary"></select></label>
-                  <label><span>对方户名</span><select data-capital-field="counterparty"></select></label>
-                  <label><span>流入</span><select data-capital-field="income"></select></label>
-                  <label><span>流出</span><select data-capital-field="expense"></select></label>
-                  <label><span>金额</span><select data-capital-field="amount"></select></label>
-                  <label><span>收支方向</span><select data-capital-field="direction"></select></label>
-                  <label><span>余额</span><select data-capital-field="balance"></select></label>
-                </div>
               </div>
               <div class="import-summary capital-import-summary" aria-live="polite">
                 <div><span>读取流水</span><strong id="capitalImportRows">0 笔</strong></div>
@@ -159,6 +144,40 @@
         </section>
       </section>
     </main>
+  </div>
+  <div class="capital-preview-backdrop" id="capitalPreviewDialog" hidden>
+    <section class="capital-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="capitalPreviewDialogTitle">
+      <div class="section-title-row">
+        <div><p class="eyebrow">表格预览</p><h3 id="capitalPreviewDialogTitle">选择资金表导入列</h3></div>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" id="closeCapitalPreviewDialog">关闭</button>
+          <button class="primary-button save-import-button" type="button" id="saveCapitalImport" disabled>保存导入</button>
+        </div>
+      </div>
+      <div class="capital-dialog-summary" id="capitalDialogSummary"></div>
+      <div class="column-mapping capital-column-mapping" id="capitalColumnMapping" hidden>
+        <div class="mapping-header">
+          <div><span>列选择</span><strong>确认Excel列对应关系</strong></div>
+          <small>下方预览会按你选择的列实时汇总</small>
+        </div>
+        <div class="mapping-grid">
+          <label><span>日期</span><select data-capital-field="date"></select></label>
+          <label><span>摘要</span><select data-capital-field="summary"></select></label>
+          <label><span>对方户名</span><select data-capital-field="counterparty"></select></label>
+          <label><span>流入</span><select data-capital-field="income"></select></label>
+          <label><span>流出</span><select data-capital-field="expense"></select></label>
+          <label><span>金额</span><select data-capital-field="amount"></select></label>
+          <label><span>收支方向</span><select data-capital-field="direction"></select></label>
+          <label><span>余额</span><select data-capital-field="balance"></select></label>
+        </div>
+      </div>
+      <div class="table-wrap raw-preview-table-wrap">
+        <table>
+          <thead id="capitalRawPreviewHead"><tr><th>暂无表格</th></tr></thead>
+          <tbody id="capitalRawPreviewBody"><tr><td>读取Sheet后显示原表预览</td></tr></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </body>
 </html>

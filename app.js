@@ -433,14 +433,73 @@
     }).filter((row) => row.date !== "未填日期" || row.income || row.expense || row.balance);
   }
 
+  function capitalColumnCount(rows) {
+    return rows.reduce((max, row) => Math.max(max, row.length), 0);
+  }
+
+  function capitalColumnLabels(headers, columnCount) {
+    return Array.from({ length: columnCount }, (_, index) => {
+      const header = String(headers[index] || "").trim();
+      return header ? `第${index + 1}列：${header}` : `第${index + 1}列`;
+    });
+  }
+
+  function renderCapitalDialogSummary() {
+    const summary = document.getElementById("capitalDialogSummary");
+    if (!summary || !pendingCapitalImport) return;
+    const rowCount = pendingCapitalImport.rows.length;
+    const dataRows = Math.max(rowCount - pendingCapitalImport.startIndex, 0);
+    summary.innerHTML = `
+      <article><span>表格行数</span><strong>${rowCount} 行</strong></article>
+      <article><span>表格列数</span><strong>${pendingCapitalImport.columnCount} 列</strong></article>
+      <article><span>数据行</span><strong>${dataRows} 行</strong></article>
+      <article><span>当前公司</span><strong>${escapeHtml(pendingCapitalImport.company.name)}</strong></article>
+    `;
+  }
+
+  function renderCapitalRawPreview() {
+    const head = document.getElementById("capitalRawPreviewHead");
+    const body = document.getElementById("capitalRawPreviewBody");
+    if (!head || !body || !pendingCapitalImport) return;
+    const labels = pendingCapitalImport.columnLabels || [];
+    if (!labels.length) {
+      head.innerHTML = '<tr><th>暂无表格</th></tr>';
+      body.innerHTML = '<tr><td>没有读取到表格列</td></tr>';
+      return;
+    }
+
+    head.innerHTML = `<tr><th class="row-index-cell">行</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`;
+    const previewStart = pendingCapitalImport.startIndex < pendingCapitalImport.rows.length
+      ? pendingCapitalImport.startIndex
+      : 0;
+    const previewRows = pendingCapitalImport.rows.slice(previewStart, previewStart + 20);
+    if (!previewRows.length) {
+      body.innerHTML = `<tr><td colspan="${labels.length + 1}">没有读取到可预览数据</td></tr>`;
+      return;
+    }
+    body.innerHTML = previewRows.map((row, offset) => `
+      <tr>
+        <td class="row-index-cell">${previewStart + offset + 1}</td>
+        ${labels.map((_, index) => `<td>${escapeHtml(row[index] ?? "")}</td>`).join("")}
+      </tr>
+    `).join("");
+  }
+
+  function openCapitalPreviewDialog() {
+    const dialog = document.getElementById("capitalPreviewDialog");
+    if (dialog) dialog.hidden = false;
+  }
+
+  function closeCapitalPreviewDialog() {
+    const dialog = document.getElementById("capitalPreviewDialog");
+    if (dialog) dialog.hidden = true;
+  }
+
   function renderCapitalColumnMapping(headers, columns) {
     const panel = document.getElementById("capitalColumnMapping");
     if (!panel) return;
     const options = ['<option value="-1">不导入</option>'].concat(
-      headers.map((header, index) => {
-        const label = String(header || `第${index + 1}列`).trim() || `第${index + 1}列`;
-        return `<option value="${index}">${escapeHtml(label)}</option>`;
-      })
+      headers.map((label, index) => `<option value="${index}">${escapeHtml(label)}</option>`)
     ).join("");
 
     panel.querySelectorAll("[data-capital-field]").forEach((select) => {
@@ -609,6 +668,11 @@
     if (panel) panel.hidden = !visible;
   }
 
+  function setCapitalPreviewButtonVisible(visible) {
+    const button = document.getElementById("openCapitalPreviewDialogButton");
+    if (button) button.hidden = !visible;
+  }
+
   function resetCapitalImportSummary() {
     setText("capitalImportRows", "0 笔");
     setText("capitalImportIn", formatMoney(0));
@@ -620,6 +684,8 @@
     pendingCapitalImport = null;
     capitalPreviewRows = [];
     setCapitalMappingVisible(false);
+    setCapitalPreviewButtonVisible(false);
+    closeCapitalPreviewDialog();
     setCapitalSaveButton(false, "保存导入");
     resetCapitalImportSummary();
     renderCapitalPreview([]);
@@ -1184,6 +1250,8 @@
 
     const rows = await readSheetRows(file, "capitalImportStatus", sheetName);
     const detected = mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
+    const columnCount = capitalColumnCount(rows);
+    const columnLabels = capitalColumnLabels(detected.headers, columnCount);
     const selectedCompany = companyData[state.selectedCompany];
 
     pendingCapitalImport = {
@@ -1193,10 +1261,16 @@
       sheetName,
       rows,
       startIndex: detected.startIndex,
+      columnCount,
+      columnLabels,
       mappedRows: []
     };
-    renderCapitalColumnMapping(detected.headers, detected.columns);
+    renderCapitalDialogSummary();
+    renderCapitalColumnMapping(columnLabels, detected.columns);
+    renderCapitalRawPreview();
     updateCapitalPreviewFromMapping();
+    setCapitalPreviewButtonVisible(true);
+    openCapitalPreviewDialog();
     setText("capitalImportStatus", `${selectedCompany.name} · 已读取${sheetName ? ` ${sheetName}` : ""}，请确认列后保存`);
   }
 
@@ -1214,6 +1288,8 @@
       const result = await postJson("/api/import/capital", payload);
       pendingCapitalImport = null;
       setCapitalSaveButton(false, "已保存");
+      setCapitalPreviewButtonVisible(false);
+      closeCapitalPreviewDialog();
       setText("capitalImportStatus", `${payload.company.name} · 已写入MySQL ${result.inserted} 笔`);
       await loadCompanies();
       await loadOverview();
@@ -1777,6 +1853,11 @@
 
     document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);
     document.getElementById("saveCapitalImport")?.addEventListener("click", saveCapitalImport);
+    document.getElementById("openCapitalPreviewDialogButton")?.addEventListener("click", openCapitalPreviewDialog);
+    document.getElementById("closeCapitalPreviewDialog")?.addEventListener("click", closeCapitalPreviewDialog);
+    document.getElementById("capitalPreviewDialog")?.addEventListener("click", (event) => {
+      if (event.target.id === "capitalPreviewDialog") closeCapitalPreviewDialog();
+    });
 
     document.getElementById("capitalColumnMapping")?.addEventListener("change", (event) => {
       if (!event.target.matches("[data-capital-field]")) return;
