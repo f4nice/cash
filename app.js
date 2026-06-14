@@ -259,6 +259,13 @@
     };
   }
 
+  function selectedCapitalAccountStatus() {
+    const company = companyData[state.selectedCompany];
+    const account = getSelectedAccount();
+    if (!company || !account) return "等待上传";
+    return `明细归属：${company.name} / ${account.bank} ${account.accountName}`;
+  }
+
   async function postJson(url, payload) {
     const response = await fetch(url, {
       method: "POST",
@@ -1205,7 +1212,9 @@
     const company = companyData[companyKey];
     if (!company) return;
     state.selectedCompany = companyKey;
-    state.selectedAccount = company.bankAccounts[0]?.id || "";
+    state.selectedAccount = company.bankAccounts.some((account) => account.id === state.selectedAccount)
+      ? state.selectedAccount
+      : company.bankAccounts[0]?.id || "";
 
     syncCompanySelection();
     if (pendingPayrollImport) {
@@ -1237,6 +1246,10 @@
     const label = `${account.bank} ${account.accountName}`;
     setText("selectedBankBadge", label);
     setText("capitalUploadBankBadge", `当前银行：${label}`);
+    setText("capitalAccountActionHint", `当前选中：${company.name} / ${label}，上传明细会归到这里`);
+    if (!pendingCapitalImport) {
+      setText("capitalImportStatus", `明细归属：${company.name} / ${label}`);
+    }
   }
 
   function renderBankAccounts() {
@@ -1257,6 +1270,48 @@
     });
 
     updateBankAccount(state.selectedAccount);
+  }
+
+  async function deleteCurrentCapitalAccountRecords() {
+    const company = companyData[state.selectedCompany];
+    const account = getSelectedAccount();
+    if (!company || !account) return;
+    const label = `${company.name} / ${account.bank} ${account.accountName}`;
+    const confirmed = window.confirm(`确认删除 ${label} 的资金明细和余额记录吗？账户名称会保留。`);
+    if (!confirmed) return;
+
+    const button = document.getElementById("deleteCapitalAccountRecords");
+    const originalLabel = button?.textContent || "删除当前账户明细";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "删除中";
+    }
+    try {
+      const result = await postJson("/api/capital/delete-account-records", {
+        company: selectedCompanyPayload(),
+        account: selectedAccountPayload()
+      });
+      pendingCapitalImport = null;
+      capitalPreviewRows = [];
+      setCapitalMappingVisible(false);
+      setCapitalMatrixVisible(false);
+      setCapitalPreviewButtonVisible(false);
+      closeCapitalPreviewDialog();
+      setCapitalSaveButton(false, "保存导入");
+      resetCapitalImportSummary();
+      renderCapitalPreview([]);
+      renderCashFlowSummary([]);
+      await loadCompanies();
+      await loadOverview();
+      setText("capitalImportStatus", `${label} · 已删除 ${result.deleted} 条资金记录`);
+    } catch (error) {
+      setText("capitalImportStatus", `${label} · 删除失败，请检查MySQL连接`);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
   }
 
   function sumProperty(company) {
@@ -2064,8 +2119,10 @@
     });
 
     document.getElementById("capitalFile")?.addEventListener("click", () => {
-      hideCapitalPreview();
+      hideCapitalPreview(selectedCapitalAccountStatus());
     });
+
+    document.getElementById("deleteCapitalAccountRecords")?.addEventListener("click", deleteCurrentCapitalAccountRecords);
 
     document.getElementById("propertyFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];

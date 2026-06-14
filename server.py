@@ -270,6 +270,66 @@ def ensure_account(cur, company_id, bank_name, account_name, account_key=None, o
     }
 
 
+def find_company(cur, code, name):
+    code = str(code or "").strip()
+    name = str(name or "").strip()
+    if code:
+        row = fetch_one(
+            cur,
+            "SELECT id, company_code, company_name FROM companies WHERE company_code = %s AND status = 'active' LIMIT 1",
+            (code,),
+        )
+        if row:
+            return row
+    if name:
+        row = fetch_one(
+            cur,
+            "SELECT id, company_code, company_name FROM companies WHERE company_name = %s AND status = 'active' LIMIT 1",
+            (name,),
+        )
+        if row:
+            return row
+        row = fetch_one(
+            cur,
+            "SELECT id, company_code, company_name FROM companies WHERE company_name LIKE %s AND status = 'active' ORDER BY id LIMIT 1",
+            (f"%{name}%",),
+        )
+        if row:
+            return row
+    raise ApiError(404, "公司不存在，不能删除资金记录")
+
+
+def find_bank_account(cur, company_id, account_payload):
+    account_key = str(account_payload.get("key") or "").strip()
+    bank_name = str(account_payload.get("bank") or "").strip()
+    account_name = str(account_payload.get("accountName") or "").strip()
+    if account_key:
+        row = fetch_one(
+            cur,
+            "SELECT id, bank_name, account_name FROM bank_accounts WHERE company_id = %s AND account_no = %s AND status = 'active' LIMIT 1",
+            (company_id, account_key),
+        )
+        if row:
+            return row
+    if bank_name or account_name:
+        row = fetch_one(
+            cur,
+            """
+            SELECT id, bank_name, account_name
+            FROM bank_accounts
+            WHERE company_id = %s
+              AND bank_name = %s
+              AND account_name = %s
+              AND status = 'active'
+            LIMIT 1
+            """,
+            (company_id, bank_name or "默认银行", account_name or "基本户"),
+        )
+        if row:
+            return row
+    raise ApiError(404, "银行账户不存在，不能删除资金记录")
+
+
 def default_account(cur, company):
     row = fetch_one(
         cur,
@@ -1008,6 +1068,40 @@ def import_capital(payload):
     return {"importNo": import_no, "inserted": inserted, "income": total_in, "expense": total_out, "net": total_in - total_out}
 
 
+def delete_capital_account_records(payload):
+    company_payload = payload.get("company") or {}
+    account_payload = payload.get("account") or {}
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            company = find_company(cur, company_payload.get("code"), company_payload.get("name"))
+            account = find_bank_account(cur, company["id"], account_payload)
+            cur.execute(
+                """
+                DELETE FROM cash_transactions
+                WHERE company_id = %s
+                  AND account_id = %s
+                  AND source_doc_no LIKE 'CAPITAL-%%'
+                """,
+                (company["id"], account["id"]),
+            )
+            deleted_transactions = cur.rowcount
+            cur.execute(
+                """
+                DELETE FROM capital_snapshots
+                WHERE company_id = %s
+                  AND account_id = %s
+                """,
+                (company["id"], account["id"]),
+            )
+            deleted_snapshots = cur.rowcount
+        conn.commit()
+    return {
+        "deleted": deleted_transactions + deleted_snapshots,
+        "transactions": deleted_transactions,
+        "snapshots": deleted_snapshots,
+    }
+
+
 def import_payroll(payload):
     rows = payload.get("rows") or []
     if not rows:
@@ -1264,6 +1358,8 @@ class Handler(SimpleHTTPRequestHandler):
             return save_company(self.read_json())
         if method == "POST" and path == "/api/import/capital":
             return import_capital(self.read_json())
+        if method == "POST" and path == "/api/capital/delete-account-records":
+            return delete_capital_account_records(self.read_json())
         if method == "POST" and path == "/api/import/payroll":
             return import_payroll(self.read_json())
         if method == "POST" and path == "/api/payroll/delete-batches":

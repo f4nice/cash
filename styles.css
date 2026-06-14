@@ -1253,6 +1253,29 @@ td {
   font-size: 19px;
 }
 
+.bank-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.bank-account-actions span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bank-account-actions div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .period-control {
   display: grid;
   gap: 7px;
@@ -1768,6 +1791,7 @@ td {
   .capital-actions,
   .property-actions,
   .payroll-actions,
+  .bank-account-actions,
   .section-title-row,
   .mapping-header,
   .dialog-actions,
@@ -1800,5 +1824,9 @@ td {
   .property-layout,
   .payroll-layout {
     grid-template-columns: 1fr;
+  }
+
+  .bank-account-actions div {
+    justify-content: stretch;
   }
 }
