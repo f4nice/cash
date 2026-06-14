@@ -65,14 +65,18 @@ button {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 8px;
-  color: white;
-  background: linear-gradient(135deg, var(--teal), var(--blue));
-  font-weight: 800;
+  flex: 0 0 42px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(10, 101, 87, 0.18);
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brand strong,

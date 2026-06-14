@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">财神爷 logo</title>
+  <desc id="desc">深青色底上的金色钱币、元宝和财字标识</desc>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f8f7a"/>
+      <stop offset="0.58" stop-color="#126c60"/>
+      <stop offset="1" stop-color="#356ea8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="18" y1="10" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe7a3"/>
+      <stop offset="0.42" stop-color="#f3b63c"/>
+      <stop offset="1" stop-color="#d9911b"/>
+    </linearGradient>
+    <linearGradient id="ingot" x1="15" y1="39" x2="51" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff0b8"/>
+      <stop offset="0.52" stop-color="#f2b537"/>
+      <stop offset="1" stop-color="#d98413"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#06352f" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#bg)"/>
+  <path d="M12 13.5C18 8.5 28 7.2 36 9.7" fill="none" stroke="#9ce3d6" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+  <circle cx="32" cy="28" r="17" fill="url(#gold)" stroke="#fff6c8" stroke-width="2.2" filter="url(#shadow)"/>
+  <circle cx="32" cy="28" r="11.4" fill="none" stroke="#fff3b0" stroke-width="1.6" opacity="0.72"/>
+  <text x="32" y="35" text-anchor="middle" font-size="21" font-weight="900" font-family="Microsoft YaHei, PingFang SC, sans-serif" fill="#0a6557">财</text>
+  <path d="M17 43.6c2.7 7.7 8 11.5 15 11.5s12.3-3.8 15-11.5c-3.9 2.5-8.9 3.8-15 3.8s-11.1-1.3-15-3.8Z" fill="url(#ingot)" stroke="#fff2b7" stroke-width="1.6" filter="url(#shadow)"/>
+  <path d="M22.5 43.5c2.8-3.6 5.9-5.3 9.5-5.3s6.7 1.7 9.5 5.3c-2.9 1.5-6.1 2.3-9.5 2.3s-6.6-.8-9.5-2.3Z" fill="#fff0b8" opacity="0.75"/>
+  <path d="M47 15.5l1.1 2.9 2.9 1.1-2.9 1.1-1.1 2.9-1.1-2.9-2.9-1.1 2.9-1.1 1.1-2.9Z" fill="#fff6c8"/>
+</svg>
