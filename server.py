@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 try:
     import pymysql
@@ -320,6 +320,86 @@ def load_overview():
     }
 
 
+def load_payroll_summary(period_value):
+    period, _, _ = month_bounds(period_value)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  COALESCE(p.employee_count, 0) AS employee_count,
+                  COALESCE(p.net_salary, 0) AS net_salary,
+                  COALESCE(p.individual_income_tax, 0) AS individual_income_tax,
+                  COALESCE(p.social_security, 0) AS social_security,
+                  COALESCE(p.housing_fund, 0) AS housing_fund,
+                  COALESCE(p.total_company_cost, 0) AS total_company_cost
+                FROM companies c
+                LEFT JOIN (
+                  SELECT
+                    r.company_id,
+                    COUNT(*) AS employee_count,
+                    SUM(r.net_salary) AS net_salary,
+                    SUM(r.individual_income_tax) AS individual_income_tax,
+                    SUM(r.employee_social_security + r.employer_social_security) AS social_security,
+                    SUM(r.employee_housing_fund + r.employer_housing_fund) AS housing_fund,
+                    SUM(r.total_company_cost) AS total_company_cost
+                  FROM payroll_records r
+                  JOIN payroll_import_batches b ON b.id = r.batch_id
+                  JOIN (
+                    SELECT company_id, MAX(id) AS batch_id
+                    FROM payroll_import_batches
+                    WHERE period_month = %s AND status = 'confirmed'
+                    GROUP BY company_id
+                  ) latest ON latest.batch_id = b.id
+                  WHERE r.period_month = %s
+                  GROUP BY r.company_id
+                ) p ON p.company_id = c.id
+                WHERE c.status = 'active'
+                ORDER BY c.id
+                """,
+                (period, period),
+            )
+            rows = cur.fetchall()
+
+    totals = {
+        "employeeCount": 0,
+        "netSalary": Decimal("0"),
+        "tax": Decimal("0"),
+        "social": Decimal("0"),
+        "fund": Decimal("0"),
+        "companyCost": Decimal("0"),
+    }
+    companies = []
+    for row in rows:
+        employee_count = int(row["employee_count"] or 0)
+        net_salary = row["net_salary"] or Decimal("0")
+        tax = row["individual_income_tax"] or Decimal("0")
+        social = row["social_security"] or Decimal("0")
+        fund = row["housing_fund"] or Decimal("0")
+        company_cost = row["total_company_cost"] or Decimal("0")
+        totals["employeeCount"] += employee_count
+        totals["netSalary"] += net_salary
+        totals["tax"] += tax
+        totals["social"] += social
+        totals["fund"] += fund
+        totals["companyCost"] += company_cost
+        companies.append(
+            {
+                "code": row["company_code"],
+                "name": row["company_name"],
+                "employeeCount": employee_count,
+                "netSalary": net_salary,
+                "tax": tax,
+                "social": social,
+                "fund": fund,
+                "companyCost": company_cost,
+            }
+        )
+    return {"period": period, "companies": companies, **totals}
+
+
 def insert_cash(cur, company_id, account_id, txn_date, direction, category, amount, counterparty="", description="", doc_no=None):
     amount = parse_amount(amount)
     if amount <= 0:
@@ -389,6 +469,7 @@ def import_payroll(payload):
     period, _, end_day = month_bounds(payload.get("period"))
     file_name = str(payload.get("fileName") or "工资单导入.xlsx")
     import_no = f"PAYROLL-{uuid.uuid4().hex[:12]}"
+    payroll_cash_categories = ["工资发放", "个税缴纳", "社保缴纳", "公积金缴纳"]
     totals = {
         "net": Decimal("0"),
         "tax": Decimal("0"),
@@ -400,6 +481,46 @@ def import_payroll(payload):
         with conn.cursor() as cur:
             company = ensure_company(cur, company_payload.get("code"), company_payload.get("name"))
             account = default_account(cur, company)
+            cur.execute(
+                """
+                SELECT id, file_hash
+                FROM payroll_import_batches
+                WHERE company_id = %s AND period_month = %s AND status <> 'voided'
+                """,
+                (company["id"], period),
+            )
+            old_batches = cur.fetchall()
+            for old_batch in old_batches:
+                old_import_no = old_batch.get("file_hash")
+                if old_import_no:
+                    cur.execute(
+                        """
+                        DELETE FROM cash_transactions
+                        WHERE company_id = %s AND txn_date = %s AND source_doc_no LIKE %s
+                        """,
+                        (company["id"], end_day, f"{old_import_no}-%"),
+                    )
+            if old_batches:
+                placeholders = ", ".join(["%s"] * len(payroll_cash_categories))
+                cur.execute(
+                    f"""
+                    DELETE FROM cash_transactions
+                    WHERE company_id = %s
+                      AND txn_date = %s
+                      AND direction = 'out'
+                      AND category IN ({placeholders})
+                      AND description LIKE %s
+                    """,
+                    (company["id"], end_day, *payroll_cash_categories, f"{period} %"),
+                )
+                cur.execute(
+                    """
+                    UPDATE payroll_import_batches
+                    SET status = 'voided', remark = %s
+                    WHERE company_id = %s AND period_month = %s AND status <> 'voided'
+                    """,
+                    (f"{period} 已由新工资单替换", company["id"], period),
+                )
             cur.execute(
                 """
                 INSERT INTO payroll_import_batches
@@ -467,10 +588,10 @@ def import_payroll(payload):
                     ),
                 )
             cash_items = [
-                ("工资发放", "员工工资", totals["net"]),
-                ("个税缴纳", "税务局", totals["tax"]),
-                ("社保缴纳", "社保机构", totals["social"]),
-                ("公积金缴纳", "公积金中心", totals["fund"]),
+                (payroll_cash_categories[0], "员工工资", totals["net"]),
+                (payroll_cash_categories[1], "税务局", totals["tax"]),
+                (payroll_cash_categories[2], "社保机构", totals["social"]),
+                (payroll_cash_categories[3], "公积金中心", totals["fund"]),
             ]
             for category, counterparty, amount in cash_items:
                 insert_cash(
@@ -486,7 +607,7 @@ def import_payroll(payload):
                     f"{import_no}-{category}",
                 )
         conn.commit()
-    return {"importNo": import_no, "rows": len(rows), **totals}
+    return {"importNo": import_no, "rows": len(rows), "replacedBatches": len(old_batches), **totals}
 
 
 def import_property(payload):
@@ -577,10 +698,13 @@ class Handler(SimpleHTTPRequestHandler):
         return json.loads(body.decode("utf-8"))
 
     def api(self, method, path):
+        query = parse_qs(urlparse(self.path).query)
         if method == "GET" and path == "/api/health":
             return {"ok": True, "database": os.getenv("MYSQL_DATABASE", "caishenye")}
         if method == "GET" and path == "/api/overview":
             return load_overview()
+        if method == "GET" and path == "/api/payroll/summary":
+            return load_payroll_summary((query.get("period") or [""])[0])
         if method == "POST" and path == "/api/import/capital":
             return import_capital(self.read_json())
         if method == "POST" and path == "/api/import/payroll":

@@ -82,6 +82,10 @@
     selectedAccount: "tech-cmb-basic"
   };
 
+  const companyCodeToKey = Object.fromEntries(
+    Object.entries(companyData).map(([key, company]) => [company.code, key])
+  );
+
   const selectedUploadFiles = {
     capital: null,
     payroll: null,
@@ -722,6 +726,7 @@
       pendingPayrollImport = null;
       setPayrollSaveButton(false, `已保存 ${result.rows}人`);
       await loadOverview();
+      await loadPayrollSummary();
     } catch (error) {
       setPayrollSaveButton(true, "重试保存");
     }
@@ -841,6 +846,47 @@
     return "steady";
   }
 
+  function renderPayrollCompanySummary(companies) {
+    const byKey = new Map();
+    companies.forEach((company) => {
+      const key = companyCodeToKey[company.code];
+      if (key) byKey.set(key, company);
+    });
+
+    document.querySelectorAll(".payroll-company-card[data-company]").forEach((card) => {
+      const key = card.dataset.company;
+      const fallback = companyData[key];
+      const company = byKey.get(key) || {};
+      const name = company.name || fallback?.name || "";
+      const employeeCount = Number(company.employeeCount || 0);
+      const companyCost = Number(company.companyCost || 0);
+      const socialFund = Number(company.social || 0) + Number(company.fund || 0);
+      card.innerHTML = `
+        <span>${escapeHtml(name)}</span>
+        <strong>${formatMoney(companyCost)}</strong>
+        <small>${employeeCount}人 · 社保公积金 ${formatMoney(socialFund)}</small>
+      `;
+    });
+  }
+
+  async function loadPayrollSummary() {
+    if (!document.getElementById("payrollEmployeeCount")) return;
+    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
+    try {
+      const response = await fetch(`/api/payroll/summary?period=${encodeURIComponent(period)}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      const socialFund = Number(data.social || 0) + Number(data.fund || 0);
+      setText("payrollEmployeeCount", `${Number(data.employeeCount || 0)} 人`);
+      setText("payrollNetSalary", formatMoney(data.netSalary));
+      setText("payrollTax", formatMoney(data.tax));
+      setText("payrollSocialFund", formatMoney(socialFund));
+      renderPayrollCompanySummary(data.companies || []);
+    } catch (error) {
+      // MySQL 未连接时保留页面上的示例数据。
+    }
+  }
+
   async function loadOverview() {
     if (!document.getElementById("todayIncomeMetric")) return;
     try {
@@ -929,6 +975,12 @@
       if (file) prepareUploadFile("property", file);
     });
 
+    document.getElementById("payrollPeriod")?.addEventListener("change", () => {
+      pendingPayrollImport = null;
+      setPayrollSaveButton(false, "保存");
+      loadPayrollSummary();
+    });
+
     document.querySelectorAll("[data-import-selected-sheet]").forEach((node) => {
       node.addEventListener("click", () => importSelectedSheet(node.dataset.importSelectedSheet));
     });
@@ -953,6 +1005,7 @@
     });
     bindEvents();
     updateCompany(state.selectedCompany);
+    loadPayrollSummary();
     loadOverview();
   });
 })();
