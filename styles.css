@@ -967,7 +967,6 @@ td {
 
 .capital-companies,
 .capital-preview,
-.capital-cashflow-card,
 .payroll-companies,
 .payroll-preview {
   padding: 14px;
@@ -1065,13 +1064,6 @@ td {
   background: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 700;
-}
-
-.capital-detail-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  margin-bottom: 16px;
 }
 
 .section-title-row {
@@ -2043,7 +2035,6 @@ td {
   }
 
   .capital-layout,
-  .capital-detail-grid,
   .property-layout,
   .property-detail-grid {
     grid-template-columns: 1fr;
