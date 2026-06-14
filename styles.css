@@ -967,6 +967,7 @@ td {
 
 .capital-companies,
 .capital-preview,
+.payroll-selected-summary,
 .payroll-companies,
 .payroll-preview {
   padding: 14px;
@@ -977,6 +978,14 @@ td {
 
 .payroll-preview[hidden] {
   display: none;
+}
+
+.payroll-selected-summary {
+  margin-bottom: 16px;
+}
+
+.payroll-selected-summary .payroll-overview {
+  margin-bottom: 0;
 }
 
 .capital-upload,

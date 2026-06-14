@@ -46,11 +46,11 @@
               <button class="ghost-button period-step-button" type="button" id="payrollNextMonth">下月</button>
             </div>
           </div>
-          <div class="payroll-overview" aria-label="工资社保总览">
-            <button class="payroll-overview-card employee-list-trigger" type="button" id="openPayrollEmployees"><span>员工人数</span><strong id="payrollEmployeeCount">42 人</strong></button>
-            <button class="payroll-overview-card salary-detail-trigger" type="button" id="openPayrollSalaryDetails"><span>实发工资</span><strong id="payrollNetSalary">¥ 121,900</strong></button>
-            <article><span>个税</span><strong id="payrollTax">¥ 8,450</strong></article>
-            <article><span>社保公积金</span><strong id="payrollSocialFund">¥ 46,500</strong></article>
+          <div class="payroll-overview payroll-total-overview" aria-label="本月工资社保汇总">
+            <article><span>本月员工</span><strong id="payrollTotalEmployeeCount">0 人</strong></article>
+            <article><span>本月实发工资</span><strong id="payrollTotalNetSalary">¥ 0</strong></article>
+            <article><span>本月个税</span><strong id="payrollTotalTax">¥ 0</strong></article>
+            <article><span>本月社保公积金</span><strong id="payrollTotalSocialFund">¥ 0</strong></article>
           </div>
           <div class="payroll-layout">
             <section class="payroll-companies" aria-labelledby="payroll-company-title">
@@ -97,6 +97,18 @@
               </div>
             </section>
           </div>
+          <section class="payroll-selected-summary" aria-labelledby="payroll-selected-summary-title">
+            <div class="section-title-row compact">
+              <div><p class="eyebrow">当前公司</p><h3 id="payroll-selected-summary-title">工资社保明细</h3></div>
+              <span id="selectedPayrollSummaryBadge">示例科技</span>
+            </div>
+            <div class="payroll-overview payroll-company-overview" aria-label="当前公司工资社保明细">
+              <button class="payroll-overview-card employee-list-trigger" type="button" id="openPayrollEmployees"><span>员工人数</span><strong id="payrollEmployeeCount">42 人</strong></button>
+              <button class="payroll-overview-card salary-detail-trigger" type="button" id="openPayrollSalaryDetails"><span>实发工资</span><strong id="payrollNetSalary">¥ 121,900</strong></button>
+              <article><span>个税</span><strong id="payrollTax">¥ 8,450</strong></article>
+              <article><span>社保公积金</span><strong id="payrollSocialFund">¥ 46,500</strong></article>
+            </div>
+          </section>
           <div class="payroll-preview" id="payrollPreviewPanel" hidden>
             <div class="section-title-row"><div><p class="eyebrow">导入预览</p><h3>员工薪资及社保</h3></div><button class="primary-button save-import-button" type="button" id="savePayrollImport" disabled>保存</button></div>
             <div class="table-wrap payroll-table-wrap">

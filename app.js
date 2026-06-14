@@ -1383,6 +1383,7 @@
     if (pendingCapitalImport) hideCapitalPreview();
 
     setText("selectedCompanyBadge", company.name);
+    setText("selectedPayrollSummaryBadge", company.name);
     setText("selectedCapitalCompanyBadge", company.name);
     setText("capitalUploadCompanyBadge", `普通流水归属：${company.name}`);
     setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
@@ -2305,6 +2306,7 @@
     const company = (summary?.companies || []).find((item) => item.code === code);
     return company || {
       code,
+      name: companyData[state.selectedCompany]?.name || "",
       employeeCount: 0,
       netSalary: 0,
       tax: 0,
@@ -2314,10 +2316,20 @@
     };
   }
 
+  function renderPayrollTotalMetrics(summary = latestPayrollSummary) {
+    if (!document.getElementById("payrollTotalEmployeeCount")) return;
+    const socialFund = Number(summary?.social || 0) + Number(summary?.fund || 0);
+    setText("payrollTotalEmployeeCount", `${Number(summary?.employeeCount || 0)} 人`);
+    setText("payrollTotalNetSalary", formatMoney(summary?.netSalary || 0));
+    setText("payrollTotalTax", formatMoney(summary?.tax || 0));
+    setText("payrollTotalSocialFund", formatMoney(socialFund));
+  }
+
   function renderSelectedPayrollMetrics(summary = latestPayrollSummary) {
     if (!document.getElementById("payrollEmployeeCount")) return;
     const company = selectedPayrollCompanySummary(summary);
     const socialFund = Number(company.social || 0) + Number(company.fund || 0);
+    setText("selectedPayrollSummaryBadge", company.name || companyData[state.selectedCompany]?.name || "");
     setText("payrollEmployeeCount", `${Number(company.employeeCount || 0)} 人`);
     setText("payrollNetSalary", formatMoney(company.netSalary));
     setText("payrollTax", formatMoney(company.tax));
@@ -2605,6 +2617,7 @@
       if (!response.ok) return;
       const data = await response.json();
       latestPayrollSummary = data;
+      renderPayrollTotalMetrics(data);
       renderSelectedPayrollMetrics(data);
       renderPayrollCompanySummary(data.companies || []);
     } catch (error) {
