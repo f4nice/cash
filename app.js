@@ -173,6 +173,20 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }
 
+  function formatDate(value) {
+    if (!value) return "-";
+    return String(value).slice(0, 10);
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "-";
+    const text = String(value).replace(" ", "T");
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const pad = (number) => String(number).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
   function selectedCompanyPayload() {
     const company = companyData[state.selectedCompany];
     return {
@@ -1263,6 +1277,96 @@
     }
   }
 
+  function ensurePayrollSalaryDialog() {
+    if (document.getElementById("payrollSalaryDialog")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="employee-dialog-backdrop" id="payrollSalaryDialog" hidden>
+        <section class="employee-dialog salary-dialog" role="dialog" aria-modal="true" aria-labelledby="payrollSalaryDialogTitle">
+          <div class="section-title-row">
+            <div><p class="eyebrow">实发工资明细</p><h3 id="payrollSalaryDialogTitle">实发工资记账明细</h3></div>
+            <button class="ghost-button" type="button" id="closePayrollSalaryDetails">关闭</button>
+          </div>
+          <div class="employee-dialog-summary" id="payrollSalaryDialogSummary"></div>
+          <div class="table-wrap employee-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>公司</th>
+                  <th>所属月份</th>
+                  <th>实发工资</th>
+                  <th>员工</th>
+                  <th>记账日期</th>
+                  <th>保存时间</th>
+                  <th>来源文件</th>
+                  <th>批次号</th>
+                </tr>
+              </thead>
+              <tbody id="payrollSalaryDetailBody"><tr><td colspan="8">暂无实发工资明细</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    `);
+    document.getElementById("closePayrollSalaryDetails")?.addEventListener("click", closePayrollSalaryDetails);
+    document.getElementById("payrollSalaryDialog")?.addEventListener("click", (event) => {
+      if (event.target.id === "payrollSalaryDialog") closePayrollSalaryDetails();
+    });
+  }
+
+  function closePayrollSalaryDetails() {
+    const dialog = document.getElementById("payrollSalaryDialog");
+    if (dialog) dialog.hidden = true;
+  }
+
+  function renderPayrollSalaryDetails(data) {
+    const summary = document.getElementById("payrollSalaryDialogSummary");
+    const tbody = document.getElementById("payrollSalaryDetailBody");
+    const batches = data.batches || [];
+    const companyCount = new Set(batches.map((batch) => batch.companyCode).filter(Boolean)).size;
+    if (summary) {
+      summary.innerHTML = `
+        <article><span>实发工资</span><strong>${formatMoney(data.netSalary)}</strong></article>
+        <article><span>员工</span><strong>${Number(data.employeeCount || 0)} 人</strong></article>
+        <article><span>公司</span><strong>${companyCount} 家</strong></article>
+        <article><span>工资批次</span><strong>${Number(data.batchCount || batches.length)} 个</strong></article>
+      `;
+    }
+    if (!tbody) return;
+    if (!batches.length) {
+      tbody.innerHTML = '<tr><td colspan="8">暂无实发工资明细</td></tr>';
+      return;
+    }
+    tbody.innerHTML = batches.map((batch) => `
+      <tr>
+        <td>${escapeHtml(batch.companyName || "-")}</td>
+        <td>${escapeHtml(batch.period || data.period || "-")}</td>
+        <td>${formatMoney(batch.netSalary)}</td>
+        <td>${Number(batch.employeeCount || 0)} 人</td>
+        <td>${escapeHtml(formatDate(batch.bookedDate))}</td>
+        <td>${escapeHtml(formatDateTime(batch.importedAt || batch.createdAt))}</td>
+        <td>${escapeHtml(batch.fileName || batch.remark || "-")}</td>
+        <td>${escapeHtml(batch.importNo || "-")}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function openPayrollSalaryDetails() {
+    ensurePayrollSalaryDialog();
+    const dialog = document.getElementById("payrollSalaryDialog");
+    const tbody = document.getElementById("payrollSalaryDetailBody");
+    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
+    if (dialog) dialog.hidden = false;
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8">读取中</td></tr>';
+    try {
+      const response = await fetch(`/api/payroll/salary-details?period=${encodeURIComponent(period)}`);
+      if (!response.ok) throw new Error("salary details unavailable");
+      const data = await response.json();
+      renderPayrollSalaryDetails(data);
+    } catch (error) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8">实发工资明细读取失败</td></tr>';
+    }
+  }
+
   async function loadPayrollSummary() {
     if (!document.getElementById("payrollEmployeeCount")) return;
     const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
@@ -1411,6 +1515,7 @@
     document.getElementById("downloadCapitalTemplate")?.addEventListener("click", downloadCapitalTemplate);
     document.getElementById("downloadPropertyTemplate")?.addEventListener("click", downloadPropertyTemplate);
     document.getElementById("openPayrollEmployees")?.addEventListener("click", openPayrollEmployees);
+    document.getElementById("openPayrollSalaryDetails")?.addEventListener("click", openPayrollSalaryDetails);
 
     document.querySelectorAll(".nav-item").forEach((node) => {
       node.addEventListener("click", () => {

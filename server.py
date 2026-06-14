@@ -501,6 +501,114 @@ def load_payroll_summary(period_value):
     return {"period": period, "companies": companies, **totals}
 
 
+def load_payroll_salary_details(period_value, company_code=""):
+    period, _, _ = month_bounds(period_value)
+    params = [period, period]
+    company_filter = ""
+    if company_code:
+        company_filter = " AND c.company_code = %s"
+        params.append(company_code)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  b.id AS batch_id,
+                  b.period_month,
+                  b.file_name,
+                  b.file_hash,
+                  b.imported_by,
+                  b.imported_at,
+                  b.created_at,
+                  b.updated_at,
+                  b.remark,
+                  COUNT(r.id) AS employee_count,
+                  COALESCE(SUM(r.net_salary), 0) AS net_salary,
+                  COALESCE(SUM(r.individual_income_tax), 0) AS individual_income_tax,
+                  COALESCE(SUM(r.employee_social_security + r.employer_social_security), 0) AS social_security,
+                  COALESCE(SUM(r.employee_housing_fund + r.employer_housing_fund), 0) AS housing_fund,
+                  COALESCE(SUM(r.total_company_cost), 0) AS total_company_cost,
+                  t.booked_date
+                FROM payroll_import_batches b
+                JOIN companies c ON c.id = b.company_id
+                JOIN (
+                  SELECT company_id, MAX(id) AS batch_id
+                  FROM payroll_import_batches
+                  WHERE period_month = %s AND status = 'confirmed'
+                  GROUP BY company_id
+                ) latest ON latest.batch_id = b.id
+                LEFT JOIN payroll_records r ON r.batch_id = b.id
+                LEFT JOIN (
+                  SELECT
+                    company_id,
+                    SUBSTRING_INDEX(source_doc_no, '-', 2) AS import_no,
+                    MIN(txn_date) AS booked_date
+                  FROM cash_transactions
+                  WHERE source_doc_no LIKE 'PAYROLL-%'
+                  GROUP BY company_id, SUBSTRING_INDEX(source_doc_no, '-', 2)
+                ) t ON t.company_id = b.company_id AND t.import_no = b.file_hash
+                WHERE b.period_month = %s AND b.status = 'confirmed'{company_filter}
+                GROUP BY
+                  c.company_code, c.company_name, b.id, b.period_month, b.file_name, b.file_hash,
+                  b.imported_by, b.imported_at, b.created_at, b.updated_at, b.remark, t.booked_date
+                ORDER BY c.id, b.id
+                """,
+                params,
+            )
+            rows = cur.fetchall()
+
+    totals = {
+        "batchCount": 0,
+        "employeeCount": 0,
+        "netSalary": Decimal("0"),
+        "tax": Decimal("0"),
+        "social": Decimal("0"),
+        "fund": Decimal("0"),
+        "companyCost": Decimal("0"),
+    }
+    batches = []
+    for row in rows:
+        employee_count = int(row["employee_count"] or 0)
+        net_salary = row["net_salary"] or Decimal("0")
+        tax = row["individual_income_tax"] or Decimal("0")
+        social = row["social_security"] or Decimal("0")
+        fund = row["housing_fund"] or Decimal("0")
+        company_cost = row["total_company_cost"] or Decimal("0")
+        totals["batchCount"] += 1
+        totals["employeeCount"] += employee_count
+        totals["netSalary"] += net_salary
+        totals["tax"] += tax
+        totals["social"] += social
+        totals["fund"] += fund
+        totals["companyCost"] += company_cost
+        batches.append(
+            {
+                "companyCode": row["company_code"],
+                "companyName": row["company_name"],
+                "batchId": row["batch_id"],
+                "period": row["period_month"],
+                "fileName": row["file_name"],
+                "importNo": row["file_hash"],
+                "importedBy": row["imported_by"],
+                "importedAt": row["imported_at"],
+                "createdAt": row["created_at"],
+                "updatedAt": row["updated_at"],
+                "bookedDate": row["booked_date"],
+                "remark": row["remark"],
+                "employeeCount": employee_count,
+                "netSalary": net_salary,
+                "tax": tax,
+                "social": social,
+                "fund": fund,
+                "companyCost": company_cost,
+            }
+        )
+    return {"period": period, "batches": batches, **totals}
+
+
 def load_payroll_employees(period_value, company_code=""):
     period, _, _ = month_bounds(period_value)
     params = [period, period]
@@ -658,6 +766,8 @@ def import_payroll(payload):
     company_payload = payload.get("company") or {}
     period, _, end_day = month_bounds(payload.get("period"))
     file_name = str(payload.get("fileName") or "工资单导入.xlsx")
+    sheet_name = str(payload.get("sheetName") or "").strip()
+    payroll_remark = f"页面上传入库 · Sheet：{sheet_name}" if sheet_name else "页面上传入库"
     import_no = f"PAYROLL-{uuid.uuid4().hex[:12]}"
     payroll_cash_categories = ["工资发放", "个税缴纳", "社保缴纳", "公积金缴纳"]
     totals = {
@@ -717,7 +827,7 @@ def import_payroll(payload):
                   (company_id, period_month, file_name, file_hash, imported_by, status, remark)
                 VALUES (%s, %s, %s, %s, %s, 'confirmed', %s)
                 """,
-                (company["id"], period, file_name, import_no, "web", "页面上传入库"),
+                (company["id"], period, file_name, import_no, "web", payroll_remark),
             )
             batch_id = cur.lastrowid
             for index, row in enumerate(rows, start=1):
@@ -897,6 +1007,8 @@ class Handler(SimpleHTTPRequestHandler):
             return load_companies()
         if method == "GET" and path == "/api/payroll/summary":
             return load_payroll_summary((query.get("period") or [""])[0])
+        if method == "GET" and path == "/api/payroll/salary-details":
+            return load_payroll_salary_details((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "GET" and path == "/api/payroll/employees":
             return load_payroll_employees((query.get("period") or [""])[0], (query.get("company") or [""])[0])
         if method == "POST" and path == "/api/companies":

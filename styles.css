@@ -710,7 +710,9 @@ td {
 }
 
 .payroll-overview-card {
+  appearance: none;
   cursor: pointer;
+  font: inherit;
 }
 
 .payroll-overview-card:hover {
