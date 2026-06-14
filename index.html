@@ -64,7 +64,7 @@
     <main class="main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">2026年6月14日 · 今日经营</p>
+          <p class="eyebrow" id="overviewPeriodLabel">本月经营</p>
           <h1>财务总览</h1>
         </div>
         <div class="topbar-actions readonly-actions">
@@ -75,19 +75,19 @@
         </div>
       </header>
 
-      <section class="metric-grid" id="overview" aria-label="今日核心指标">
+      <section class="metric-grid" id="overview" aria-label="本月核心指标">
         <article class="metric-tile">
-          <span>今日收入</span>
+          <span>本月收入</span>
           <strong id="todayIncomeMetric">¥ 126,800</strong>
           <small>销售回款、服务收入</small>
         </article>
         <article class="metric-tile">
-          <span>今日支出</span>
+          <span>本月支出</span>
           <strong id="todayExpenseMetric">¥ 78,450</strong>
           <small>采购、工资、物业</small>
         </article>
         <article class="metric-tile">
-          <span>今日净现金流</span>
+          <span>本月净现金流</span>
           <strong id="todayNetMetric">¥ 48,350</strong>
           <small>收入 - 支出</small>
         </article>
@@ -103,7 +103,7 @@
           <div class="panel-header">
             <div>
               <p class="eyebrow">各公司盈利状态</p>
-              <h2 id="profit-status-title">今日公司经营状态</h2>
+              <h2 id="profit-status-title">本月公司经营状态</h2>
             </div>
           </div>
 
@@ -130,8 +130,8 @@
               <thead>
                 <tr>
                   <th>公司</th>
-                  <th>今日收入</th>
-                  <th>今日支出</th>
+                  <th>本月收入</th>
+                  <th>本月支出</th>
                   <th>净现金流</th>
                   <th>盈利状态</th>
                   <th>备注</th>
@@ -144,7 +144,7 @@
                   <td>¥ 35,400</td>
                   <td class="positive">¥ 32,600</td>
                   <td><span class="status-pill good">盈利</span></td>
-                  <td>销售回款覆盖当日支出</td>
+                  <td>本月收入覆盖支出</td>
                 </tr>
                 <tr>
                   <td>示例贸易</td>

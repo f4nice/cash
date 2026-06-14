@@ -2605,6 +2605,10 @@
       if (!response.ok) return;
       const data = await response.json();
       const companies = data.companies || [];
+      if (data.period) {
+        const [year, month] = String(data.period).split("-");
+        setText("overviewPeriodLabel", `${year}年${Number(month)}月 · 月度经营`);
+      }
       setText("todayIncomeMetric", formatMoney(data.income));
       setText("todayExpenseMetric", formatMoney(data.expense));
       setText("todayNetMetric", formatMoney(data.net));
@@ -2630,7 +2634,7 @@
             <td>${formatMoney(company.expense)}</td>
             <td class="${Number(company.net) >= 0 ? "positive" : "negative"}">${formatMoney(company.net)}</td>
             <td><span class="status-pill ${statusClass(company)}">${escapeHtml(company.status)}</span></td>
-            <td>${Number(company.net) > 0 ? "今日现金流为正" : (Number(company.net) < 0 ? "今日支出高于收入" : "今日收支平稳")}</td>
+            <td>${Number(company.net) > 0 ? "本月现金流为正" : (Number(company.net) < 0 ? "本月支出高于收入" : "本月收支平稳")}</td>
           </tr>
         `).join("");
       }

@@ -384,7 +384,7 @@ def ensure_seed_data():
 
 
 def load_overview():
-    today = date.today()
+    period, start_day, end_day = month_bounds(date.today().strftime("%Y-%m"))
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -396,12 +396,12 @@ def load_overview():
                   COALESCE(SUM(CASE WHEN t.direction = 'out' THEN t.amount ELSE 0 END), 0) AS expense
                 FROM companies c
                 LEFT JOIN cash_transactions t
-                  ON t.company_id = c.id AND t.txn_date = %s
+                  ON t.company_id = c.id AND t.txn_date BETWEEN %s AND %s
                 WHERE c.status = 'active'
                 GROUP BY c.id, c.company_code, c.company_name
                 ORDER BY c.id
                 """,
-                (today,),
+                (start_day, end_day),
             )
             rows = cur.fetchall()
     companies = []
@@ -427,7 +427,9 @@ def load_overview():
             }
         )
     return {
-        "date": today.isoformat(),
+        "period": period,
+        "startDate": start_day.isoformat(),
+        "endDate": end_day.isoformat(),
         "income": total_income,
         "expense": total_expense,
         "net": total_income - total_expense,
