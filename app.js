@@ -100,6 +100,7 @@
   let payrollPreviewRows = [];
   let selectedPayrollRowIndexes = new Set();
   let selectedSalaryBatchIds = new Set();
+  let latestPayrollSummary = null;
 
   const uploadUi = {
     capital: {
@@ -219,6 +220,10 @@
       code: company.code,
       name: company.name
     };
+  }
+
+  function selectedCompanyCode() {
+    return companyData[state.selectedCompany]?.code || "";
   }
 
   function selectedAccountPayload() {
@@ -824,6 +829,7 @@
     setText("propertyUploadCompanyBadge", `当前公司：${company.name}`);
     renderBankAccounts();
     renderPropertyStats();
+    renderSelectedPayrollMetrics();
   }
 
   function updateBankAccount(accountId) {
@@ -1211,6 +1217,30 @@
     });
   }
 
+  function selectedPayrollCompanySummary(summary = latestPayrollSummary) {
+    const code = selectedCompanyCode();
+    const company = (summary?.companies || []).find((item) => item.code === code);
+    return company || {
+      code,
+      employeeCount: 0,
+      netSalary: 0,
+      tax: 0,
+      social: 0,
+      fund: 0,
+      companyCost: 0
+    };
+  }
+
+  function renderSelectedPayrollMetrics(summary = latestPayrollSummary) {
+    if (!document.getElementById("payrollEmployeeCount")) return;
+    const company = selectedPayrollCompanySummary(summary);
+    const socialFund = Number(company.social || 0) + Number(company.fund || 0);
+    setText("payrollEmployeeCount", `${Number(company.employeeCount || 0)} 人`);
+    setText("payrollNetSalary", formatMoney(company.netSalary));
+    setText("payrollTax", formatMoney(company.tax));
+    setText("payrollSocialFund", formatMoney(socialFund));
+  }
+
   function ensurePayrollEmployeeDialog() {
     if (document.getElementById("payrollEmployeeDialog")) return;
     document.body.insertAdjacentHTML("beforeend", `
@@ -1293,7 +1323,10 @@
     if (dialog) dialog.hidden = false;
     if (tbody) tbody.innerHTML = '<tr><td colspan="9">读取中</td></tr>';
     try {
-      const response = await fetch(`/api/payroll/employees?period=${encodeURIComponent(period)}`);
+      const params = new URLSearchParams({ period });
+      const companyCode = selectedCompanyCode();
+      if (companyCode) params.set("company", companyCode);
+      const response = await fetch(`/api/payroll/employees?${params.toString()}`);
       if (!response.ok) throw new Error("employees unavailable");
       const data = await response.json();
       renderPayrollEmployeeList(data);
@@ -1389,7 +1422,10 @@
     const tbody = document.getElementById("payrollSalaryDetailBody");
     const period = selectedPayrollPeriod();
     if (tbody) tbody.innerHTML = '<tr><td colspan="10">读取中</td></tr>';
-    const response = await fetch(`/api/payroll/salary-details?period=${encodeURIComponent(period)}`);
+    const params = new URLSearchParams({ period });
+    const companyCode = selectedCompanyCode();
+    if (companyCode) params.set("company", companyCode);
+    const response = await fetch(`/api/payroll/salary-details?${params.toString()}`);
     if (!response.ok) throw new Error("salary details unavailable");
     const data = await response.json();
     renderPayrollSalaryDetails(data);
@@ -1485,11 +1521,8 @@
       const response = await fetch(`/api/payroll/summary?period=${encodeURIComponent(period)}`);
       if (!response.ok) return;
       const data = await response.json();
-      const socialFund = Number(data.social || 0) + Number(data.fund || 0);
-      setText("payrollEmployeeCount", `${Number(data.employeeCount || 0)} 人`);
-      setText("payrollNetSalary", formatMoney(data.netSalary));
-      setText("payrollTax", formatMoney(data.tax));
-      setText("payrollSocialFund", formatMoney(socialFund));
+      latestPayrollSummary = data;
+      renderSelectedPayrollMetrics(data);
       renderPayrollCompanySummary(data.companies || []);
     } catch (error) {
       // MySQL 未连接时保留页面上的示例数据。
