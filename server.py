@@ -441,7 +441,14 @@ def load_companies(as_of_value=""):
     with get_db() as conn:
         with conn.cursor() as cur:
             if as_of is None:
-                cur.execute("SELECT MAX(snapshot_date) AS latest_date FROM capital_snapshots")
+                cur.execute(
+                    """
+                    SELECT MAX(s.snapshot_date) AS latest_date
+                    FROM capital_snapshots s
+                    JOIN companies c ON c.id = s.company_id AND c.status = 'active'
+                    JOIN bank_accounts a ON a.id = s.account_id AND a.status = 'active'
+                    """
+                )
                 as_of = (cur.fetchone() or {}).get("latest_date") or date.today()
             period, start_day, end_day = month_bounds(as_of.strftime("%Y-%m"))
             cur.execute(
