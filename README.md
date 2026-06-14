@@ -6,6 +6,9 @@
 
 - `schema.sql`：MySQL 初始化脚本，包含表、索引、外键和汇总视图。
 - `examples.sql`：常用录入和查询示例。
+- `index.html`：网站首页和财务驾驶舱界面。
+- `styles.css`：首页样式。
+- `app.js`：工资单公司选择、Excel/CSV 读取、薪资社保汇总预览。
 
 ## 导入方式
 

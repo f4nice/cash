@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>财神爷财务驾驶舱</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -38,15 +40,15 @@
 
       <section class="company-panel" aria-labelledby="company-title">
         <h2 id="company-title">公司</h2>
-        <button class="company-row selected" type="button">
+        <button class="company-row selected" type="button" data-company="tech">
           <span>示例科技</span>
           <strong>¥ 1,284,600</strong>
         </button>
-        <button class="company-row" type="button">
+        <button class="company-row" type="button" data-company="trade">
           <span>示例贸易</span>
           <strong>¥ 684,200</strong>
         </button>
-        <button class="company-row" type="button">
+        <button class="company-row" type="button" data-company="holding">
           <span>控股主体</span>
           <strong>¥ 2,108,900</strong>
         </button>
@@ -61,7 +63,7 @@
         </div>
         <div class="topbar-actions">
           <button class="icon-button" type="button" title="筛选月份" aria-label="筛选月份">6月</button>
-          <button class="primary-button" type="button">上传工资单</button>
+          <button class="primary-button" type="button" data-scroll-target="payroll-upload">上传工资单</button>
         </div>
       </header>
 
@@ -131,30 +133,127 @@
           </div>
         </section>
 
-        <section class="panel span-6" id="payroll" aria-labelledby="payroll-title">
+        <section class="panel span-12 payroll-workspace" id="payroll" aria-labelledby="payroll-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">工资单</p>
-              <h2 id="payroll-title">工资、个税、社保</h2>
+              <p class="eyebrow">工资社保</p>
+              <h2 id="payroll-title">工资单工作台</h2>
             </div>
-            <button class="ghost-button" type="button">查看明细</button>
+            <div class="payroll-actions">
+              <button class="ghost-button" type="button" id="downloadTemplate">下载模板</button>
+              <button class="primary-button" type="button" data-open-file>上传Excel</button>
+            </div>
           </div>
-          <div class="stack-list">
-            <div class="cost-row">
+
+          <div class="payroll-overview" aria-label="工资社保总览">
+            <article>
+              <span>本月员工</span>
+              <strong id="payrollEmployeeCount">42 人</strong>
+            </article>
+            <article>
               <span>实发工资</span>
-              <strong>¥ 121,900</strong>
-            </div>
-            <div class="cost-row">
+              <strong id="payrollNetSalary">¥ 121,900</strong>
+            </article>
+            <article>
               <span>个税</span>
-              <strong>¥ 8,450</strong>
+              <strong id="payrollTax">¥ 8,450</strong>
+            </article>
+            <article>
+              <span>社保公积金</span>
+              <strong id="payrollSocialFund">¥ 46,500</strong>
+            </article>
+          </div>
+
+          <div class="payroll-layout">
+            <section class="payroll-companies" aria-labelledby="payroll-company-title">
+              <div class="section-title-row">
+                <div>
+                  <p class="eyebrow">各公司情况</p>
+                  <h3 id="payroll-company-title">选择公司</h3>
+                </div>
+                <span id="selectedCompanyBadge">示例科技</span>
+              </div>
+
+              <div class="payroll-company-grid">
+                <button class="payroll-company-card selected" type="button" data-company="tech">
+                  <span>示例科技</span>
+                  <strong>¥ 78,450</strong>
+                  <small>18人 · 社保 ¥15,600</small>
+                </button>
+                <button class="payroll-company-card" type="button" data-company="trade">
+                  <span>示例贸易</span>
+                  <strong>¥ 54,800</strong>
+                  <small>14人 · 社保 ¥11,900</small>
+                </button>
+                <button class="payroll-company-card" type="button" data-company="holding">
+                  <span>控股主体</span>
+                  <strong>¥ 43,600</strong>
+                  <small>10人 · 社保 ¥7,200</small>
+                </button>
+              </div>
+            </section>
+
+            <section class="payroll-upload" id="payroll-upload" aria-labelledby="payroll-upload-title">
+              <div class="section-title-row">
+                <div>
+                  <p class="eyebrow">Excel导入</p>
+                  <h3 id="payroll-upload-title">工资单上传</h3>
+                </div>
+                <span id="uploadCompanyBadge">当前公司：示例科技</span>
+              </div>
+
+              <label class="upload-zone" id="payrollDropZone" for="payrollFile">
+                <input id="payrollFile" type="file" accept=".xls,.xlsx,.csv">
+                <span class="upload-icon" aria-hidden="true">XLS</span>
+                <strong>选择工资单Excel</strong>
+                <small id="uploadFileName">未选择文件</small>
+              </label>
+
+              <div class="import-summary" aria-live="polite">
+                <div>
+                  <span>读取员工</span>
+                  <strong id="importRows">0 人</strong>
+                </div>
+                <div>
+                  <span>人工成本</span>
+                  <strong id="importCost">¥ 0</strong>
+                </div>
+                <div>
+                  <span>社保公积金</span>
+                  <strong id="importSocialFund">¥ 0</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="payroll-preview">
+            <div class="section-title-row">
+              <div>
+                <p class="eyebrow">导入预览</p>
+                <h3>员工薪资及社保</h3>
+              </div>
+              <span id="importStatus">等待上传</span>
             </div>
-            <div class="cost-row">
-              <span>社保合计</span>
-              <strong>¥ 34,700</strong>
-            </div>
-            <div class="cost-row">
-              <span>公积金合计</span>
-              <strong>¥ 11,800</strong>
+            <div class="table-wrap payroll-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>员工</th>
+                    <th>应发工资</th>
+                    <th>实发工资</th>
+                    <th>个税</th>
+                    <th>个人社保</th>
+                    <th>公司社保</th>
+                    <th>公积金合计</th>
+                    <th>公司人工成本</th>
+                  </tr>
+                </thead>
+                <tbody id="payrollPreviewBody">
+                  <tr>
+                    <td colspan="8">暂无导入数据</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -183,7 +282,7 @@
           </div>
         </section>
 
-        <section class="panel span-12" aria-labelledby="table-title">
+        <section class="panel span-6" aria-labelledby="table-title">
           <div class="panel-header">
             <div>
               <p class="eyebrow">公司汇总</p>
@@ -199,9 +298,7 @@
                   <th>资金余额</th>
                   <th>收入</th>
                   <th>人工成本</th>
-                  <th>物业费</th>
                   <th>净利润</th>
-                  <th>内部往来</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,27 +307,21 @@
                   <td>¥ 1,284,600</td>
                   <td>¥ 486,000</td>
                   <td>¥ 78,450</td>
-                  <td>¥ 18,600</td>
                   <td class="positive">¥ 126,800</td>
-                  <td>应收 ¥ 20,000</td>
                 </tr>
                 <tr>
                   <td>示例贸易</td>
                   <td>¥ 684,200</td>
                   <td>¥ 312,000</td>
                   <td>¥ 54,800</td>
-                  <td>¥ 7,200</td>
                   <td class="positive">¥ 62,400</td>
-                  <td>应付 ¥ 20,000</td>
                 </tr>
                 <tr>
                   <td>控股主体</td>
                   <td>¥ 2,108,900</td>
                   <td>¥ 138,000</td>
                   <td>¥ 43,600</td>
-                  <td>¥ 2,400</td>
                   <td class="positive">¥ 29,200</td>
-                  <td>平衡</td>
                 </tr>
               </tbody>
             </table>
