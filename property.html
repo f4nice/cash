@@ -30,10 +30,6 @@
     <main class="main">
       <header class="topbar">
         <div><p class="eyebrow">物业费用数据维护</p><h1>物业费用</h1></div>
-        <div class="topbar-actions">
-          <button class="ghost-button" type="button" id="downloadPropertyTemplate">下载模板</button>
-          <label class="primary-button file-action" for="propertyFile" role="button" tabindex="0">上传Excel</label>
-        </div>
       </header>
 
       <section class="content-grid">
@@ -55,7 +51,16 @@
               </div>
             </section>
             <section class="property-upload" id="property-upload" aria-labelledby="property-upload-title">
-              <div class="section-title-row"><div><p class="eyebrow">Excel导入</p><h3 id="property-upload-title">物业费用上传</h3></div><span id="propertyUploadCompanyBadge">当前公司：示例科技</span></div>
+              <div class="section-title-row">
+                <div><p class="eyebrow">Excel导入</p><h3 id="property-upload-title">物业费用上传</h3></div>
+                <div class="upload-card-actions">
+                  <span id="propertyUploadCompanyBadge">当前公司：示例科技</span>
+                  <div class="upload-button-row">
+                    <button class="ghost-button" type="button" id="downloadPropertyTemplate">下载模板</button>
+                    <label class="primary-button file-action" for="propertyFile" role="button" tabindex="0">上传Excel</label>
+                  </div>
+                </div>
+              </div>
               <label class="period-control">
                 <span>所属月份</span>
                 <input id="propertyPeriod" type="month" value="2026-06" data-default-current>

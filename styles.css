@@ -726,6 +726,33 @@ td {
   font-weight: 700;
 }
 
+.upload-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-card-actions > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(15, 143, 122, 0.24);
+  border-radius: 8px;
+  color: var(--muted);
+  background: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.upload-button-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .section-title-row.compact {
   margin-bottom: 10px;
 }
@@ -1165,7 +1192,9 @@ td {
   .capital-actions,
   .property-actions,
   .payroll-actions,
-  .section-title-row {
+  .section-title-row,
+  .upload-card-actions,
+  .upload-button-row {
     align-items: stretch;
     flex-direction: column;
   }

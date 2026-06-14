@@ -36,10 +36,6 @@
           <p class="eyebrow">资金数据维护</p>
           <h1>资金表</h1>
         </div>
-        <div class="topbar-actions">
-          <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
-          <label class="primary-button file-action" for="capitalFile" role="button" tabindex="0">上传Excel</label>
-        </div>
       </header>
 
       <section class="content-grid">
@@ -75,7 +71,13 @@
             <section class="capital-upload" id="capital-upload" aria-labelledby="capital-upload-title">
               <div class="section-title-row">
                 <div><p class="eyebrow">Excel导入</p><h3 id="capital-upload-title">银行资金表上传</h3></div>
-                <span id="capitalUploadCompanyBadge">当前公司：示例科技</span>
+                <div class="upload-card-actions">
+                  <span id="capitalUploadCompanyBadge">当前公司：示例科技</span>
+                  <div class="upload-button-row">
+                    <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
+                    <label class="primary-button file-action" for="capitalFile" role="button" tabindex="0">上传Excel</label>
+                  </div>
+                </div>
               </div>
               <label class="upload-zone" for="capitalFile">
                 <input id="capitalFile" type="file" accept=".xls,.xlsx,.csv">
