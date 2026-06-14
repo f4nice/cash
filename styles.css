@@ -679,18 +679,29 @@ td {
 }
 
 .capital-companies,
-.capital-upload,
 .capital-preview,
 .capital-chart-card,
 .capital-cashflow-card,
 .payroll-companies,
-.payroll-upload,
-.payroll-preview,
-.property-upload {
+.payroll-preview {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(247, 250, 249, 0.76);
+}
+
+.capital-upload,
+.payroll-upload,
+.property-upload {
+  padding: 14px;
+  border: 1px solid rgba(53, 110, 168, 0.28);
+  border-top: 3px solid var(--amber);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 234, 0.96), rgba(247, 251, 255, 0.94) 58%, rgba(232, 244, 241, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 10px 26px rgba(53, 110, 168, 0.09);
 }
 
 .capital-detail-grid {
@@ -903,6 +914,13 @@ td {
   text-align: center;
 }
 
+.capital-upload .upload-zone,
+.payroll-upload .upload-zone,
+.property-upload .upload-zone {
+  border-color: rgba(53, 110, 168, 0.36);
+  background: rgba(255, 255, 255, 0.84);
+}
+
 .upload-zone input {
   position: absolute;
   width: 1px;
@@ -940,6 +958,13 @@ td {
   padding: 10px;
   border-radius: 8px;
   background: white;
+}
+
+.capital-upload .import-summary div,
+.payroll-upload .import-summary div,
+.property-upload .import-summary div {
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .import-summary strong {
