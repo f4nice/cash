@@ -357,6 +357,9 @@ def ensure_seed_data():
         return
     with conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total FROM companies WHERE status = 'active'")
+            if int((cur.fetchone() or {}).get("total") or 0) > 0:
+                return
             for seed in SEED_COMPANIES:
                 company = ensure_company(cur, seed["code"], seed["name"], update_name=False)
                 for key, bank, account, account_type, balance in seed["accounts"]:
@@ -548,8 +551,7 @@ def save_company(payload):
         with conn.cursor() as cur:
             if not code:
                 code = next_company_code(cur)
-            company = ensure_company(cur, code, name)
-            ensure_account(cur, company["id"], "默认银行", "基本户", f"{code}-default", 0)
+            ensure_company(cur, code, name)
         conn.commit()
     return load_companies()
 

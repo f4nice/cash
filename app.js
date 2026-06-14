@@ -252,6 +252,13 @@
 
   function selectedAccountPayload() {
     const account = getSelectedAccount();
+    if (!account) {
+      return {
+        key: "",
+        bank: "",
+        accountName: ""
+      };
+    }
     return {
       key: account.id,
       bank: account.bank,
@@ -490,7 +497,38 @@
   }
 
   function capitalDateValue(value) {
-    return excelSerialDate(value) || String(value || "").trim();
+    return capitalDateText(value);
+  }
+
+  function capitalYearValue(value) {
+    const match = /(\d{4})/.exec(String(value || ""));
+    return match ? match[1] : "";
+  }
+
+  function capitalDateText(value, year = "") {
+    const serialDate = excelSerialDate(value);
+    if (serialDate) return serialDate;
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    let match = /^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/.exec(text);
+    if (match) {
+      return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}-${String(Number(match[3])).padStart(2, "0")}`;
+    }
+
+    match = /^(\d{1,2})月(\d{1,2})日?$/.exec(text);
+    if (match) {
+      const selectedYear = year || String(new Date().getFullYear());
+      return `${selectedYear}-${String(Number(match[1])).padStart(2, "0")}-${String(Number(match[2])).padStart(2, "0")}`;
+    }
+
+    match = /^(\d{1,2})[-/.](\d{1,2})$/.exec(text);
+    if (match) {
+      const selectedYear = year || String(new Date().getFullYear());
+      return `${selectedYear}-${String(Number(match[1])).padStart(2, "0")}-${String(Number(match[2])).padStart(2, "0")}`;
+    }
+
+    return text;
   }
 
   function stableHash(text) {
@@ -550,6 +588,7 @@
       bank,
       accountName: bankShort || parts[1] || "基本户",
       accountKey: `CAP${stableHash(`${companyShort}-${first}`).slice(0, 18)}`,
+      bankMatched: Boolean(bankShort),
       selected: true
     };
   }
@@ -569,8 +608,10 @@
       if (!isCapitalMatrixHeader(header)) continue;
       const numericCount = rows.slice(1).filter((row) => hasNumericContent(row[index])).length;
       if (!numericCount) continue;
+      const parsed = parseCapitalMatrixHeader(header, index);
+      if (!parsed.bankMatched) continue;
       columns.push({
-        ...parseCapitalMatrixHeader(header, index),
+        ...parsed,
         numericCount
       });
     }
@@ -669,8 +710,10 @@
     if (!pendingCapitalImport) return [];
     const dateColumn = pendingCapitalImport.dateColumn >= 0 ? pendingCapitalImport.dateColumn : 1;
     const rows = [];
+    let activeYear = "";
     pendingCapitalImport.rows.slice(pendingCapitalImport.startIndex).forEach((row) => {
-      const dateValue = capitalDateValue(row[dateColumn]);
+      activeYear = capitalYearValue(row[0]) || activeYear;
+      const dateValue = capitalDateText(row[dateColumn], activeYear);
       if (!dateValue) return;
       selectedCapitalMatrixColumns().forEach((column) => {
         const rawBalance = row[column.index];
@@ -858,7 +901,7 @@
 
   function getSelectedAccount() {
     const company = companyData[state.selectedCompany];
-    return company.bankAccounts.find((account) => account.id === state.selectedAccount) || company.bankAccounts[0];
+    return company?.bankAccounts.find((account) => account.id === state.selectedAccount) || company?.bankAccounts[0] || null;
   }
 
   function setText(id, value) {
@@ -966,7 +1009,7 @@
       code,
       name: raw.name || code,
       funds: Number(raw.funds || 0),
-      bankAccounts: bankAccounts.length ? bankAccounts : [{ id: `${code}-default`, bank: "默认银行", accountName: "基本户", balance: 0 }],
+      bankAccounts,
       payroll: previous.payroll || {
         employees: 0,
         netSalary: 0,
@@ -995,7 +1038,7 @@
       state.selectedCompany = Object.keys(companyData)[0];
     }
     if (!companyData[state.selectedCompany].bankAccounts.some((account) => account.id === state.selectedAccount)) {
-      state.selectedAccount = companyData[state.selectedCompany].bankAccounts[0]?.id;
+      state.selectedAccount = companyData[state.selectedCompany].bankAccounts[0]?.id || "";
     }
   }
 
@@ -1234,10 +1277,20 @@
 
   function updateBankAccount(accountId) {
     const company = companyData[state.selectedCompany];
-    const account = company.bankAccounts.find((item) => item.id === accountId);
-    if (!account) return;
+    const account = company?.bankAccounts.find((item) => item.id === accountId);
+    const deleteButton = document.getElementById("deleteCapitalAccountRecords");
+    if (!account) {
+      state.selectedAccount = "";
+      setText("selectedBankBadge", "暂无银行账户");
+      setText("capitalUploadBankBadge", "当前银行：暂无账户");
+      setText("capitalAccountActionHint", `${company?.name || "当前公司"} 暂无银行账户，上传资金表后会自动生成`);
+      if (deleteButton) deleteButton.disabled = true;
+      if (!pendingCapitalImport) setText("capitalImportStatus", "上传资金表后自动按列生成银行账户");
+      return;
+    }
     if (pendingCapitalImport) hideCapitalPreview();
     state.selectedAccount = accountId;
+    if (deleteButton) deleteButton.disabled = false;
 
     document.querySelectorAll("[data-bank-account]").forEach((node) => {
       node.classList.toggle("selected", node.dataset.bankAccount === accountId);
@@ -1256,6 +1309,11 @@
     const company = companyData[state.selectedCompany];
     const list = document.getElementById("bankAccountList");
     if (!list) return;
+    if (!company.bankAccounts.length) {
+      list.innerHTML = '<div class="bank-account-empty">暂无银行账户</div>';
+      updateBankAccount("");
+      return;
+    }
 
     list.innerHTML = company.bankAccounts.map((account) => `
       <button class="bank-account-button${account.id === state.selectedAccount ? " selected" : ""}" type="button" data-bank-account="${account.id}">

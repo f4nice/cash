@@ -1253,6 +1253,18 @@ td {
   font-size: 19px;
 }
 
+.bank-account-empty {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #f7faf9;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .bank-account-actions {
   display: flex;
   align-items: center;
