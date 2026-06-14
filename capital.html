@@ -36,7 +36,20 @@
           <p class="eyebrow">资金数据维护</p>
           <h1>资金表</h1>
         </div>
+        <div class="topbar-actions capital-top-actions">
+          <span id="capitalUploadFileName" class="upload-file-name">未选择文件</span>
+          <button class="ghost-button" type="button" id="openCapitalPreviewDialogButton" hidden>查看预览</button>
+          <label class="primary-button file-action" for="capitalFile" role="button" tabindex="0">上传资金表Excel</label>
+          <input id="capitalFile" class="hidden-file-input" type="file" accept=".xls,.xlsx,.csv">
+        </div>
       </header>
+      <div class="capital-import-bar">
+        <span id="capitalImportStatus">等待上传</span>
+        <div class="sheet-control compact-sheet-control" id="capitalSheetControl" hidden>
+          <label for="capitalSheetSelect"><span>选择Sheet</span><select id="capitalSheetSelect"></select></label>
+          <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
+        </div>
+      </div>
 
       <section class="content-grid">
         <section class="panel span-12 capital-workspace" id="capital" aria-labelledby="capital-title">
@@ -68,36 +81,6 @@
                 <div class="bank-account-list" id="bankAccountList"></div>
               </div>
             </section>
-            <section class="capital-upload" id="capital-upload" aria-labelledby="capital-upload-title">
-              <div class="section-title-row">
-                <div><p class="eyebrow">Excel导入</p><h3 id="capital-upload-title">银行资金表上传</h3></div>
-                <div class="upload-card-actions">
-                  <span id="capitalUploadCompanyBadge">普通流水归属：示例科技</span>
-                  <div class="upload-button-row">
-                    <button class="ghost-button" type="button" id="openCapitalPreviewDialogButton" hidden>查看预览</button>
-                    <button class="ghost-button" type="button" id="downloadCapitalTemplate">下载模板</button>
-                    <label class="primary-button file-action" for="capitalFile" role="button" tabindex="0">上传Excel</label>
-                  </div>
-                </div>
-              </div>
-              <label class="upload-zone" for="capitalFile">
-                <input id="capitalFile" type="file" accept=".xls,.xlsx,.csv">
-                <span class="upload-icon" aria-hidden="true">BANK</span>
-                <strong>选择银行流水或资金表</strong>
-                <small id="capitalUploadFileName">未选择文件</small>
-              </label>
-              <p class="upload-note">多公司总资金表会按列名自动归档，例如“轩夸建行”归到轩夸公司和建设银行。</p>
-              <div class="sheet-control" id="capitalSheetControl" hidden>
-                <label for="capitalSheetSelect"><span>选择Sheet</span><select id="capitalSheetSelect"></select></label>
-                <button class="ghost-button" type="button" data-import-selected-sheet="capital">读取此Sheet</button>
-              </div>
-              <div class="import-summary capital-import-summary" aria-live="polite">
-                <div><span>读取记录</span><strong id="capitalImportRows">0 笔</strong></div>
-                <div><span>流入</span><strong id="capitalImportIn">¥ 0</strong></div>
-                <div><span>流出</span><strong id="capitalImportOut">¥ 0</strong></div>
-                <div><span>余额合计</span><strong id="capitalImportNet">¥ 0</strong></div>
-              </div>
-            </section>
           </div>
           <div class="capital-detail-grid">
             <section class="capital-chart-card">
@@ -116,7 +99,7 @@
             <section class="capital-cashflow-card">
               <div class="section-title-row compact">
                 <div><p class="eyebrow">现金流表</p><h3>公司现金流汇总</h3></div>
-                <span id="capitalImportStatus">等待上传</span>
+                <span id="capitalImportSummary">读取记录 0 条 · 余额合计 ¥ 0</span>
               </div>
               <div class="table-wrap cashflow-table-wrap">
                 <table>

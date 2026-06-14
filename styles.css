@@ -234,6 +234,26 @@ h2 {
   gap: 10px;
 }
 
+.capital-top-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.upload-file-name {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .icon-button,
 .primary-button,
 .ghost-button,
@@ -776,6 +796,30 @@ td {
   grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.75fr);
   gap: 14px;
   margin-bottom: 16px;
+}
+
+.capital-workspace .capital-layout {
+  grid-template-columns: 1fr;
+}
+
+.capital-import-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(247, 250, 249, 0.84);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compact-sheet-control {
+  min-width: min(460px, 100%);
+  margin-top: 0;
 }
 
 .capital-companies,
@@ -1688,6 +1732,15 @@ td {
 
   .topbar-actions .primary-button {
     grid-column: 1 / -1;
+  }
+
+  .capital-top-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .capital-import-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .nav-list {

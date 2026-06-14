@@ -730,10 +730,11 @@
       const latestBalance = capitalPreviewRows
         .filter((row) => row.date === latestDate)
         .reduce((sum, row) => sum + row.balance, 0);
-      setText("capitalImportRows", `${capitalPreviewRows.length} 条`);
-      setText("capitalImportIn", formatMoney(0));
-      setText("capitalImportOut", formatMoney(0));
-      setText("capitalImportNet", formatMoney(latestBalance));
+      setCapitalImportSummary(capitalPreviewRows, {
+        label: "识别资金列",
+        countUnit: "条",
+        balance: latestBalance
+      });
       renderCapitalPreview(capitalPreviewRows);
       renderCashFlowSummary(capitalPreviewRows);
       setCapitalSaveButton(capitalPreviewRows.length > 0);
@@ -747,10 +748,12 @@
     pendingCapitalImport.mappedRows = capitalPreviewRows;
 
     const total = summarizeCapital(capitalPreviewRows);
-    setText("capitalImportRows", `${total.rows} 笔`);
-    setText("capitalImportIn", formatMoney(total.income));
-    setText("capitalImportOut", formatMoney(total.expense));
-    setText("capitalImportNet", formatMoney(total.net));
+    setCapitalImportSummary(capitalPreviewRows, {
+      label: "读取流水",
+      countUnit: "笔",
+      income: total.income,
+      expense: total.expense
+    });
     renderCapitalPreview(capitalPreviewRows);
     renderCashFlowSummary(capitalPreviewRows);
     setCapitalSaveButton(capitalPreviewRows.length > 0);
@@ -893,11 +896,25 @@
     if (button) button.hidden = !visible;
   }
 
+  function setCapitalImportSummary(rows, options = {}) {
+    const count = rows.length;
+    const countUnit = options.countUnit || "条";
+    const label = options.label || "读取记录";
+    if (Number.isFinite(options.income) || Number.isFinite(options.expense)) {
+      const income = Number(options.income || 0);
+      const expense = Number(options.expense || 0);
+      setText("capitalImportSummary", `${label} ${count} ${countUnit} · 流入 ${formatMoney(income)} · 流出 ${formatMoney(expense)}`);
+      return;
+    }
+
+    const balance = Number.isFinite(options.balance)
+      ? options.balance
+      : rows.reduce((sum, row) => sum + Number(row.balance || 0), 0);
+    setText("capitalImportSummary", `${label} ${count} ${countUnit} · 余额合计 ${formatMoney(balance)}`);
+  }
+
   function resetCapitalImportSummary() {
-    setText("capitalImportRows", "0 笔");
-    setText("capitalImportIn", formatMoney(0));
-    setText("capitalImportOut", formatMoney(0));
-    setText("capitalImportNet", formatMoney(0));
+    setCapitalImportSummary([], { balance: 0 });
   }
 
   function hideCapitalPreview(label = "等待上传") {
