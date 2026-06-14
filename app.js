@@ -99,6 +99,7 @@
   let pendingPayrollImport = null;
   let payrollPreviewRows = [];
   let selectedPayrollRowIndexes = new Set();
+  let selectedSalaryBatchIds = new Set();
 
   const uploadUi = {
     capital: {
@@ -171,6 +172,30 @@
   function currentPeriod() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function selectedPayrollPeriod() {
+    return document.getElementById("payrollPeriod")?.value || currentPeriod();
+  }
+
+  function shiftPeriod(period, offset) {
+    const match = /^(\d{4})-(\d{2})$/.exec(period || currentPeriod());
+    const year = match ? Number(match[1]) : new Date().getFullYear();
+    const month = match ? Number(match[2]) - 1 : new Date().getMonth();
+    const date = new Date(year, month + offset, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function setPayrollPeriod(period) {
+    const input = document.getElementById("payrollPeriod");
+    if (input) input.value = period;
+    handlePayrollPeriodChange();
+  }
+
+  function handlePayrollPeriodChange() {
+    const period = selectedPayrollPeriod();
+    if (pendingPayrollImport) pendingPayrollImport.period = period;
+    loadPayrollSummary();
   }
 
   function formatDate(value) {
@@ -1027,7 +1052,7 @@
     selectedPayrollRowIndexes = new Set(payrollRows.map((_, index) => index));
     pendingPayrollImport = {
       company: selectedCompanyPayload(),
-      period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
+      period: selectedPayrollPeriod(),
       fileName: file.name,
       sheetName,
       rows: selectedPayrollRows()
@@ -1264,7 +1289,7 @@
     ensurePayrollEmployeeDialog();
     const dialog = document.getElementById("payrollEmployeeDialog");
     const tbody = document.getElementById("payrollEmployeeListBody");
-    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
+    const period = selectedPayrollPeriod();
     if (dialog) dialog.hidden = false;
     if (tbody) tbody.innerHTML = '<tr><td colspan="9">读取中</td></tr>';
     try {
@@ -1284,15 +1309,20 @@
         <section class="employee-dialog salary-dialog" role="dialog" aria-modal="true" aria-labelledby="payrollSalaryDialogTitle">
           <div class="section-title-row">
             <div><p class="eyebrow">实发工资明细</p><h3 id="payrollSalaryDialogTitle">实发工资记账明细</h3></div>
-            <button class="ghost-button" type="button" id="closePayrollSalaryDetails">关闭</button>
+            <div class="salary-dialog-actions">
+              <button class="ghost-button danger-button" type="button" id="deletePayrollSalaryBatches" disabled>删除选中</button>
+              <button class="ghost-button" type="button" id="closePayrollSalaryDetails">关闭</button>
+            </div>
           </div>
           <div class="employee-dialog-summary" id="payrollSalaryDialogSummary"></div>
           <div class="table-wrap employee-table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th class="select-cell"><input id="selectAllSalaryBatches" type="checkbox" aria-label="全选工资记录"></th>
                   <th>公司</th>
                   <th>所属月份</th>
+                  <th>状态</th>
                   <th>实发工资</th>
                   <th>员工</th>
                   <th>记账日期</th>
@@ -1301,13 +1331,35 @@
                   <th>批次号</th>
                 </tr>
               </thead>
-              <tbody id="payrollSalaryDetailBody"><tr><td colspan="8">暂无实发工资明细</td></tr></tbody>
+              <tbody id="payrollSalaryDetailBody"><tr><td colspan="10">暂无实发工资明细</td></tr></tbody>
             </table>
           </div>
         </section>
       </div>
     `);
     document.getElementById("closePayrollSalaryDetails")?.addEventListener("click", closePayrollSalaryDetails);
+    document.getElementById("deletePayrollSalaryBatches")?.addEventListener("click", deleteSelectedPayrollSalaryBatches);
+    document.getElementById("selectAllSalaryBatches")?.addEventListener("change", (event) => {
+      const checks = Array.from(document.querySelectorAll(".salary-batch-check"));
+      selectedSalaryBatchIds = event.target.checked
+        ? new Set(checks.map((check) => Number(check.dataset.batchId)).filter(Boolean))
+        : new Set();
+      checks.forEach((check) => {
+        check.checked = event.target.checked;
+      });
+      updateSalaryBatchSelection();
+    });
+    document.getElementById("payrollSalaryDetailBody")?.addEventListener("change", (event) => {
+      if (!event.target.classList.contains("salary-batch-check")) return;
+      const batchId = Number(event.target.dataset.batchId);
+      if (!Number.isInteger(batchId)) return;
+      if (event.target.checked) {
+        selectedSalaryBatchIds.add(batchId);
+      } else {
+        selectedSalaryBatchIds.delete(batchId);
+      }
+      updateSalaryBatchSelection();
+    });
     document.getElementById("payrollSalaryDialog")?.addEventListener("click", (event) => {
       if (event.target.id === "payrollSalaryDialog") closePayrollSalaryDetails();
     });
@@ -1318,28 +1370,90 @@
     if (dialog) dialog.hidden = true;
   }
 
+  function updateSalaryBatchSelection() {
+    const checks = Array.from(document.querySelectorAll(".salary-batch-check"));
+    const selectAll = document.getElementById("selectAllSalaryBatches");
+    const deleteButton = document.getElementById("deletePayrollSalaryBatches");
+    if (selectAll) {
+      selectAll.checked = checks.length > 0 && checks.every((check) => check.checked);
+      selectAll.indeterminate = checks.some((check) => check.checked) && !selectAll.checked;
+    }
+    if (deleteButton) {
+      const count = selectedSalaryBatchIds.size;
+      deleteButton.disabled = count === 0;
+      deleteButton.textContent = count ? `删除选中 ${count}` : "删除选中";
+    }
+  }
+
+  async function loadPayrollSalaryDetailsIntoDialog() {
+    const tbody = document.getElementById("payrollSalaryDetailBody");
+    const period = selectedPayrollPeriod();
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10">读取中</td></tr>';
+    const response = await fetch(`/api/payroll/salary-details?period=${encodeURIComponent(period)}`);
+    if (!response.ok) throw new Error("salary details unavailable");
+    const data = await response.json();
+    renderPayrollSalaryDetails(data);
+  }
+
+  async function deleteSelectedPayrollSalaryBatches() {
+    const batchIds = Array.from(selectedSalaryBatchIds);
+    if (!batchIds.length) return;
+    if (!window.confirm(`确定删除选中的 ${batchIds.length} 条工资记录？删除后本月汇总会重新计算。`)) return;
+    const button = document.getElementById("deletePayrollSalaryBatches");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "删除中";
+    }
+    try {
+      await postJson("/api/payroll/delete-batches", { batchIds });
+      selectedSalaryBatchIds = new Set();
+      await loadPayrollSummary();
+      await loadPayrollSalaryDetailsIntoDialog();
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = `重试删除 ${batchIds.length}`;
+      }
+    }
+  }
+
   function renderPayrollSalaryDetails(data) {
     const summary = document.getElementById("payrollSalaryDialogSummary");
     const tbody = document.getElementById("payrollSalaryDetailBody");
     const batches = data.batches || [];
-    const companyCount = new Set(batches.map((batch) => batch.companyCode).filter(Boolean)).size;
+    const history = data.history || batches;
+    const audit = data.audit || {};
+    const recordCount = Number(audit.recordCount ?? history.length);
+    const voidedCount = Number(audit.voidedBatchCount || 0);
+    const duplicateLabel = audit.duplicateRisk
+      ? "需检查"
+      : (!batches.length && recordCount > 0 ? "已删除" : (voidedCount > 0 ? "已替换不重复" : "无重复"));
+    selectedSalaryBatchIds = new Set();
     if (summary) {
       summary.innerHTML = `
         <article><span>实发工资</span><strong>${formatMoney(data.netSalary)}</strong></article>
-        <article><span>员工</span><strong>${Number(data.employeeCount || 0)} 人</strong></article>
-        <article><span>公司</span><strong>${companyCount} 家</strong></article>
-        <article><span>工资批次</span><strong>${Number(data.batchCount || batches.length)} 个</strong></article>
+        <article><span>计入员工</span><strong>${Number(data.employeeCount || 0)} 人</strong></article>
+        <article><span>本月记录</span><strong>${recordCount} 次</strong></article>
+        <article><span>重复状态</span><strong>${duplicateLabel}</strong></article>
       `;
     }
     if (!tbody) return;
-    if (!batches.length) {
-      tbody.innerHTML = '<tr><td colspan="8">暂无实发工资明细</td></tr>';
+    if (!history.length) {
+      tbody.innerHTML = '<tr><td colspan="10">暂无实发工资明细</td></tr>';
+      updateSalaryBatchSelection();
       return;
     }
-    tbody.innerHTML = batches.map((batch) => `
+    tbody.innerHTML = history.map((batch) => {
+      const isDeleted = batch.status === "voided" && String(batch.remark || "").includes("删除");
+      const statusText = batch.isActive
+        ? "计入汇总"
+        : (isDeleted ? "已删除" : (batch.status === "voided" ? "已替换" : "未计入"));
+      return `
       <tr>
+        <td class="select-cell"><input class="salary-batch-check" type="checkbox" data-batch-id="${Number(batch.batchId || 0)}" aria-label="选择工资记录"></td>
         <td>${escapeHtml(batch.companyName || "-")}</td>
         <td>${escapeHtml(batch.period || data.period || "-")}</td>
+        <td><span class="status-pill ${batch.isActive ? "good" : (batch.status === "voided" ? "steady" : "loss")}">${statusText}</span></td>
         <td>${formatMoney(batch.netSalary)}</td>
         <td>${Number(batch.employeeCount || 0)} 人</td>
         <td>${escapeHtml(formatDate(batch.bookedDate))}</td>
@@ -1347,29 +1461,26 @@
         <td>${escapeHtml(batch.fileName || batch.remark || "-")}</td>
         <td>${escapeHtml(batch.importNo || "-")}</td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
+    updateSalaryBatchSelection();
   }
 
   async function openPayrollSalaryDetails() {
     ensurePayrollSalaryDialog();
     const dialog = document.getElementById("payrollSalaryDialog");
     const tbody = document.getElementById("payrollSalaryDetailBody");
-    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
     if (dialog) dialog.hidden = false;
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8">读取中</td></tr>';
     try {
-      const response = await fetch(`/api/payroll/salary-details?period=${encodeURIComponent(period)}`);
-      if (!response.ok) throw new Error("salary details unavailable");
-      const data = await response.json();
-      renderPayrollSalaryDetails(data);
+      await loadPayrollSalaryDetailsIntoDialog();
     } catch (error) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="8">实发工资明细读取失败</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="10">实发工资明细读取失败</td></tr>';
     }
   }
 
   async function loadPayrollSummary() {
     if (!document.getElementById("payrollEmployeeCount")) return;
-    const period = document.getElementById("payrollPeriod")?.value || currentPeriod();
+    const period = selectedPayrollPeriod();
     try {
       const response = await fetch(`/api/payroll/summary?period=${encodeURIComponent(period)}`);
       if (!response.ok) return;
@@ -1477,10 +1588,12 @@
       if (file) prepareUploadFile("property", file);
     });
 
-    document.getElementById("payrollPeriod")?.addEventListener("change", () => {
-      pendingPayrollImport = null;
-      setPayrollSaveButton(false, "保存");
-      loadPayrollSummary();
+    document.getElementById("payrollPeriod")?.addEventListener("change", handlePayrollPeriodChange);
+    document.getElementById("payrollPrevMonth")?.addEventListener("click", () => {
+      setPayrollPeriod(shiftPeriod(selectedPayrollPeriod(), -1));
+    });
+    document.getElementById("payrollNextMonth")?.addEventListener("click", () => {
+      setPayrollPeriod(shiftPeriod(selectedPayrollPeriod(), 1));
     });
 
     document.querySelectorAll("[data-import-selected-sheet]").forEach((node) => {

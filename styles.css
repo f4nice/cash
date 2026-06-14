@@ -450,6 +450,42 @@ h2 {
   margin-bottom: 18px;
 }
 
+.payroll-period-switcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.payroll-period-control {
+  min-width: 168px;
+  margin-bottom: 0;
+}
+
+.period-step-button {
+  min-height: 38px;
+}
+
+.salary-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger-button {
+  color: #b23a33;
+  border-color: rgba(178, 58, 51, 0.28);
+}
+
+.danger-button:not(:disabled):hover {
+  background: #fff2f1;
+}
+
+.danger-button:disabled {
+  color: var(--muted);
+}
+
 .segmented {
   display: flex;
   gap: 4px;
@@ -1416,6 +1452,15 @@ td {
   .panel-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .payroll-period-switcher,
+  .salary-dialog-actions {
+    justify-content: stretch;
+  }
+
+  .payroll-period-control {
+    flex: 1;
   }
 
   .topbar-actions {

@@ -34,9 +34,19 @@
 
       <section class="content-grid">
         <section class="panel span-12 payroll-workspace" id="payroll" aria-labelledby="payroll-title">
-          <div class="panel-header"><div><p class="eyebrow">工资社保</p><h2 id="payroll-title">工资单工作台</h2></div></div>
+          <div class="panel-header payroll-panel-header">
+            <div><p class="eyebrow">工资社保</p><h2 id="payroll-title">工资单工作台</h2></div>
+            <div class="payroll-period-switcher" aria-label="选择工资所属月份">
+              <button class="ghost-button period-step-button" type="button" id="payrollPrevMonth">上月</button>
+              <label class="period-control payroll-period-control">
+                <span>所属月份</span>
+                <input id="payrollPeriod" type="month" value="2026-06" data-default-current>
+              </label>
+              <button class="ghost-button period-step-button" type="button" id="payrollNextMonth">下月</button>
+            </div>
+          </div>
           <div class="payroll-overview" aria-label="工资社保总览">
-            <button class="payroll-overview-card employee-list-trigger" type="button" id="openPayrollEmployees"><span>本月员工</span><strong id="payrollEmployeeCount">42 人</strong></button>
+            <button class="payroll-overview-card employee-list-trigger" type="button" id="openPayrollEmployees"><span>员工人数</span><strong id="payrollEmployeeCount">42 人</strong></button>
             <button class="payroll-overview-card salary-detail-trigger" type="button" id="openPayrollSalaryDetails"><span>实发工资</span><strong id="payrollNetSalary">¥ 121,900</strong></button>
             <article><span>个税</span><strong id="payrollTax">¥ 8,450</strong></article>
             <article><span>社保公积金</span><strong id="payrollSocialFund">¥ 46,500</strong></article>
@@ -68,10 +78,6 @@
                   </div>
                 </div>
               </div>
-              <label class="period-control">
-                <span>所属月份</span>
-                <input id="payrollPeriod" type="month" value="2026-06" data-default-current>
-              </label>
               <label class="upload-zone" id="payrollDropZone" for="payrollFile">
                 <input id="payrollFile" type="file" accept=".xls,.xlsx,.csv">
                 <span class="upload-icon" aria-hidden="true">XLS</span>

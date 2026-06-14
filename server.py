@@ -503,11 +503,11 @@ def load_payroll_summary(period_value):
 
 def load_payroll_salary_details(period_value, company_code=""):
     period, _, _ = month_bounds(period_value)
-    params = [period, period]
+    active_params = [period, period]
     company_filter = ""
     if company_code:
         company_filter = " AND c.company_code = %s"
-        params.append(company_code)
+        active_params.append(company_code)
 
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -556,9 +556,55 @@ def load_payroll_salary_details(period_value, company_code=""):
                   b.imported_by, b.imported_at, b.created_at, b.updated_at, b.remark, t.booked_date
                 ORDER BY c.id, b.id
                 """,
-                params,
+                active_params,
             )
             rows = cur.fetchall()
+            history_params = [period]
+            if company_code:
+                history_params.append(company_code)
+            cur.execute(
+                f"""
+                SELECT
+                  c.company_code,
+                  c.company_name,
+                  b.id AS batch_id,
+                  b.period_month,
+                  b.file_name,
+                  b.file_hash,
+                  b.imported_by,
+                  b.imported_at,
+                  b.created_at,
+                  b.updated_at,
+                  b.status,
+                  b.remark,
+                  COUNT(r.id) AS employee_count,
+                  COALESCE(SUM(r.net_salary), 0) AS net_salary,
+                  COALESCE(SUM(r.individual_income_tax), 0) AS individual_income_tax,
+                  COALESCE(SUM(r.employee_social_security + r.employer_social_security), 0) AS social_security,
+                  COALESCE(SUM(r.employee_housing_fund + r.employer_housing_fund), 0) AS housing_fund,
+                  COALESCE(SUM(r.total_company_cost), 0) AS total_company_cost,
+                  t.booked_date
+                FROM payroll_import_batches b
+                JOIN companies c ON c.id = b.company_id
+                LEFT JOIN payroll_records r ON r.batch_id = b.id
+                LEFT JOIN (
+                  SELECT
+                    company_id,
+                    SUBSTRING_INDEX(source_doc_no, '-', 2) AS import_no,
+                    MIN(txn_date) AS booked_date
+                  FROM cash_transactions
+                  WHERE source_doc_no LIKE 'PAYROLL-%%'
+                  GROUP BY company_id, SUBSTRING_INDEX(source_doc_no, '-', 2)
+                ) t ON t.company_id = b.company_id AND t.import_no = b.file_hash
+                WHERE b.period_month = %s{company_filter}
+                GROUP BY
+                  c.company_code, c.company_name, b.id, b.period_month, b.file_name, b.file_hash,
+                  b.imported_by, b.imported_at, b.created_at, b.updated_at, b.status, b.remark, t.booked_date
+                ORDER BY c.id, b.id DESC
+                """,
+                history_params,
+            )
+            history_rows = cur.fetchall()
 
     totals = {
         "batchCount": 0,
@@ -570,13 +616,44 @@ def load_payroll_salary_details(period_value, company_code=""):
         "companyCost": Decimal("0"),
     }
     batches = []
-    for row in rows:
+    active_batch_ids = set()
+
+    def payroll_batch_payload(row, is_active=False):
         employee_count = int(row["employee_count"] or 0)
-        net_salary = row["net_salary"] or Decimal("0")
-        tax = row["individual_income_tax"] or Decimal("0")
-        social = row["social_security"] or Decimal("0")
-        fund = row["housing_fund"] or Decimal("0")
-        company_cost = row["total_company_cost"] or Decimal("0")
+        employee_social = row.get("social_security") or Decimal("0")
+        employee_fund = row.get("housing_fund") or Decimal("0")
+        return {
+            "companyCode": row["company_code"],
+            "companyName": row["company_name"],
+            "batchId": row["batch_id"],
+            "period": row["period_month"],
+            "fileName": row["file_name"],
+            "importNo": row["file_hash"],
+            "importedBy": row["imported_by"],
+            "importedAt": row["imported_at"],
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+            "bookedDate": row["booked_date"],
+            "status": row.get("status") or "confirmed",
+            "isActive": bool(is_active),
+            "remark": row["remark"],
+            "employeeCount": employee_count,
+            "netSalary": row["net_salary"] or Decimal("0"),
+            "tax": row["individual_income_tax"] or Decimal("0"),
+            "social": employee_social,
+            "fund": employee_fund,
+            "companyCost": row["total_company_cost"] or Decimal("0"),
+        }
+
+    for row in rows:
+        active_batch_ids.add(row["batch_id"])
+        batch = payroll_batch_payload(row, True)
+        employee_count = batch["employeeCount"]
+        net_salary = batch["netSalary"]
+        tax = batch["tax"]
+        social = batch["social"]
+        fund = batch["fund"]
+        company_cost = batch["companyCost"]
         totals["batchCount"] += 1
         totals["employeeCount"] += employee_count
         totals["netSalary"] += net_salary
@@ -584,29 +661,47 @@ def load_payroll_salary_details(period_value, company_code=""):
         totals["social"] += social
         totals["fund"] += fund
         totals["companyCost"] += company_cost
-        batches.append(
+        batches.append(batch)
+
+    history = []
+    company_audit = {}
+    for row in history_rows:
+        is_active = row["batch_id"] in active_batch_ids
+        item = payroll_batch_payload(row, is_active)
+        history.append(item)
+        audit = company_audit.setdefault(
+            item["companyCode"],
             {
-                "companyCode": row["company_code"],
-                "companyName": row["company_name"],
-                "batchId": row["batch_id"],
-                "period": row["period_month"],
-                "fileName": row["file_name"],
-                "importNo": row["file_hash"],
-                "importedBy": row["imported_by"],
-                "importedAt": row["imported_at"],
-                "createdAt": row["created_at"],
-                "updatedAt": row["updated_at"],
-                "bookedDate": row["booked_date"],
-                "remark": row["remark"],
-                "employeeCount": employee_count,
-                "netSalary": net_salary,
-                "tax": tax,
-                "social": social,
-                "fund": fund,
-                "companyCost": company_cost,
-            }
+                "companyCode": item["companyCode"],
+                "companyName": item["companyName"],
+                "recordCount": 0,
+                "activeCount": 0,
+                "confirmedCount": 0,
+                "voidedCount": 0,
+            },
         )
-    return {"period": period, "batches": batches, **totals}
+        audit["recordCount"] += 1
+        if item["isActive"]:
+            audit["activeCount"] += 1
+        if item["status"] == "confirmed":
+            audit["confirmedCount"] += 1
+        if item["status"] == "voided":
+            audit["voidedCount"] += 1
+
+    repeated_companies = sum(1 for item in company_audit.values() if item["recordCount"] > 1)
+    duplicate_risk = any(
+        item["activeCount"] > 1 or item["confirmedCount"] > item["activeCount"]
+        for item in company_audit.values()
+    )
+    audit = {
+        "recordCount": len(history),
+        "activeBatchCount": len(batches),
+        "voidedBatchCount": sum(1 for item in history if item["status"] == "voided"),
+        "repeatedCompanyCount": repeated_companies,
+        "duplicateRisk": duplicate_risk,
+        "companies": list(company_audit.values()),
+    }
+    return {"period": period, "batches": batches, "history": history, "audit": audit, **totals}
 
 
 def load_payroll_employees(period_value, company_code=""):
@@ -696,6 +791,56 @@ def load_payroll_employees(period_value, company_code=""):
             }
         )
     return {"period": period, "employees": employees, **totals}
+
+
+def delete_payroll_batches(payload):
+    raw_ids = payload.get("batchIds") or []
+    batch_ids = []
+    for raw_id in raw_ids:
+        try:
+            batch_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if batch_id > 0:
+            batch_ids.append(batch_id)
+    batch_ids = sorted(set(batch_ids))
+    if not batch_ids:
+        raise ApiError(400, "请选择要删除的工资记录")
+
+    placeholders = ", ".join(["%s"] * len(batch_ids))
+    deleted = 0
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT id, company_id, period_month, file_hash
+                FROM payroll_import_batches
+                WHERE id IN ({placeholders})
+                """,
+                batch_ids,
+            )
+            rows = cur.fetchall()
+            for row in rows:
+                import_no = row.get("file_hash")
+                if import_no:
+                    cur.execute(
+                        """
+                        DELETE FROM cash_transactions
+                        WHERE company_id = %s AND source_doc_no LIKE %s
+                        """,
+                        (row["company_id"], f"{import_no}-%"),
+                    )
+                cur.execute(
+                    """
+                    UPDATE payroll_import_batches
+                    SET status = 'voided', remark = %s
+                    WHERE id = %s
+                    """,
+                    (f"{row['period_month']} 页面删除，不再计入汇总", row["id"]),
+                )
+                deleted += 1
+        conn.commit()
+    return {"deleted": deleted, "batchIds": batch_ids}
 
 
 def insert_cash(cur, company_id, account_id, txn_date, direction, category, amount, counterparty="", description="", doc_no=None):
@@ -1017,6 +1162,8 @@ class Handler(SimpleHTTPRequestHandler):
             return import_capital(self.read_json())
         if method == "POST" and path == "/api/import/payroll":
             return import_payroll(self.read_json())
+        if method == "POST" and path == "/api/payroll/delete-batches":
+            return delete_payroll_batches(self.read_json())
         if method == "POST" and path == "/api/import/property":
             return import_property(self.read_json())
         raise ApiError(404, "接口不存在")
