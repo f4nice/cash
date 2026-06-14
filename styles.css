@@ -230,6 +230,13 @@ h2 {
   font-weight: 700;
 }
 
+.file-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .ghost-button {
   padding: 0 12px;
   color: var(--teal-dark);

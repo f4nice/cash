@@ -882,6 +882,14 @@
       node.addEventListener("click", () => document.getElementById("propertyFile")?.click());
     });
 
+    document.querySelectorAll(".file-action[for]").forEach((node) => {
+      node.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        document.getElementById(node.getAttribute("for"))?.click();
+      });
+    });
+
     document.getElementById("payrollFile")?.addEventListener("change", (event) => {
       const file = event.target.files?.[0];
       if (file) prepareUploadFile("payroll", file);
