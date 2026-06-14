@@ -112,6 +112,10 @@ def parse_day(value, fallback=None):
         if 20000 <= number <= 80000:
             return (datetime(1899, 12, 30) + timedelta(days=number)).date()
     text = text.replace("年", "-").replace("月", "-").replace("日", "")
+    match = re.fullmatch(r"(\d{1,2})-(\d{1,2})", text)
+    if match:
+        selected_year = (fallback or date.today()).year
+        return date(selected_year, int(match.group(1)), int(match.group(2)))
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y-%m", "%Y/%m"):
         try:
             parsed = datetime.strptime(text, fmt)
