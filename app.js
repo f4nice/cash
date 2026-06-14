@@ -97,6 +97,8 @@
   };
 
   let pendingPayrollImport = null;
+  let payrollPreviewRows = [];
+  let selectedPayrollRowIndexes = new Set();
 
   const uploadUi = {
     capital: {
@@ -274,6 +276,9 @@
     setText(ui.fileNameId, file.name);
     if (kind === "payroll") {
       pendingPayrollImport = null;
+      payrollPreviewRows = [];
+      selectedPayrollRowIndexes = new Set();
+      renderPayrollPreview([]);
       setPayrollSaveButton(false);
     }
 
@@ -441,6 +446,34 @@
       total.amount += row.amount;
       return total;
     }, { rows: 0, amount: 0 });
+  }
+
+  function selectedPayrollRows() {
+    return payrollPreviewRows.filter((_, index) => selectedPayrollRowIndexes.has(index));
+  }
+
+  function updatePayrollSelectionSummary() {
+    const rows = selectedPayrollRows();
+    const total = summarizePayroll(rows);
+    const selectAll = document.getElementById("selectAllPayrollRows");
+
+    setText("importRows", `${total.rows} 人`);
+    setText("importCost", formatMoney(total.totalCost));
+    setText("importTax", formatMoney(total.tax));
+    setText("importSocialFund", formatMoney(
+      total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
+    ));
+
+    if (selectAll) {
+      selectAll.disabled = payrollPreviewRows.length === 0;
+      selectAll.checked = payrollPreviewRows.length > 0 && rows.length === payrollPreviewRows.length;
+      selectAll.indeterminate = rows.length > 0 && rows.length < payrollPreviewRows.length;
+    }
+
+    if (pendingPayrollImport) {
+      pendingPayrollImport.rows = rows;
+      setPayrollSaveButton(rows.length > 0, rows.length ? "保存" : "无数据");
+    }
   }
 
   function getSelectedAccount() {
@@ -740,6 +773,9 @@
     syncCompanySelection();
     if (pendingPayrollImport) {
       pendingPayrollImport = null;
+      payrollPreviewRows = [];
+      selectedPayrollRowIndexes = new Set();
+      renderPayrollPreview([]);
       setPayrollSaveButton(false, "保存");
     }
 
@@ -879,12 +915,16 @@
     const tbody = document.getElementById("payrollPreviewBody");
     if (!tbody) return;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8">暂无导入数据</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9">暂无导入数据</td></tr>';
+      updatePayrollSelectionSummary();
       return;
     }
 
-    tbody.innerHTML = rows.slice(0, 12).map((row) => `
+    tbody.innerHTML = rows.map((row, index) => `
       <tr>
+        <td class="select-cell">
+          <input class="payroll-row-check" type="checkbox" data-payroll-row="${index}" aria-label="选择${escapeHtml(row.name || `第${index + 1}行`)}" ${selectedPayrollRowIndexes.has(index) ? "checked" : ""}>
+        </td>
         <td>${escapeHtml(row.name || "-")}</td>
         <td>${formatMoney(row.gross)}</td>
         <td>${formatMoney(row.net)}</td>
@@ -895,6 +935,7 @@
         <td>${formatMoney(row.totalCost)}</td>
       </tr>
     `).join("");
+    updatePayrollSelectionSummary();
   }
 
   function renderCapitalPreview(rows) {
@@ -962,27 +1003,22 @@
   async function readPayrollFile(file, sheetName = "") {
     setText("uploadFileName", file.name);
     pendingPayrollImport = null;
+    payrollPreviewRows = [];
+    selectedPayrollRowIndexes = new Set();
     setPayrollSaveButton(false, "读取中");
 
     const rows = await readSheetRows(file, null, sheetName);
     const payrollRows = mapPayrollRows(rows);
-    const total = summarizePayroll(payrollRows);
-
-    setText("importRows", `${total.rows} 人`);
-    setText("importCost", formatMoney(total.totalCost));
-    setText("importTax", formatMoney(total.tax));
-    setText("importSocialFund", formatMoney(
-      total.employeeSocial + total.employerSocial + total.employeeFund + total.employerFund
-    ));
-    renderPayrollPreview(payrollRows);
+    payrollPreviewRows = payrollRows;
+    selectedPayrollRowIndexes = new Set(payrollRows.map((_, index) => index));
     pendingPayrollImport = {
       company: selectedCompanyPayload(),
       period: document.getElementById("payrollPeriod")?.value || currentPeriod(),
       fileName: file.name,
       sheetName,
-      rows: payrollRows
+      rows: selectedPayrollRows()
     };
-    setPayrollSaveButton(payrollRows.length > 0, payrollRows.length ? "保存" : "无数据");
+    renderPayrollPreview(payrollRows);
   }
 
   async function savePayrollImport() {
@@ -1254,6 +1290,28 @@
 
     document.querySelectorAll("[data-import-selected-sheet]").forEach((node) => {
       node.addEventListener("click", () => importSelectedSheet(node.dataset.importSelectedSheet));
+    });
+
+    document.getElementById("selectAllPayrollRows")?.addEventListener("change", (event) => {
+      selectedPayrollRowIndexes = event.target.checked
+        ? new Set(payrollPreviewRows.map((_, index) => index))
+        : new Set();
+      document.querySelectorAll(".payroll-row-check").forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+      updatePayrollSelectionSummary();
+    });
+
+    document.getElementById("payrollPreviewBody")?.addEventListener("change", (event) => {
+      if (!event.target.classList.contains("payroll-row-check")) return;
+      const index = Number(event.target.dataset.payrollRow);
+      if (!Number.isInteger(index)) return;
+      if (event.target.checked) {
+        selectedPayrollRowIndexes.add(index);
+      } else {
+        selectedPayrollRowIndexes.delete(index);
+      }
+      updatePayrollSelectionSummary();
     });
 
     document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);
