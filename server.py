@@ -392,16 +392,15 @@ def load_overview(period_value=""):
                 SELECT
                   c.company_code,
                   c.company_name,
-                  COALESCE(SUM(CASE WHEN t.direction = 'in' THEN t.amount ELSE 0 END), 0) AS income,
-                  COALESCE(SUM(CASE WHEN t.direction = 'out' THEN t.amount ELSE 0 END), 0) AS expense
+                  COALESCE(p.revenue, 0) AS income,
+                  COALESCE(p.revenue - p.net_profit, 0) AS expense
                 FROM companies c
-                LEFT JOIN cash_transactions t
-                  ON t.company_id = c.id AND t.txn_date BETWEEN %s AND %s
+                LEFT JOIN profit_monthly p
+                  ON p.company_id = c.id AND p.period_month = %s
                 WHERE c.status = 'active'
-                GROUP BY c.id, c.company_code, c.company_name
                 ORDER BY c.id
                 """,
-                (start_day, end_day),
+                (period,),
             )
             rows = cur.fetchall()
     companies = []
