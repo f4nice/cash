@@ -393,14 +393,29 @@ def load_overview(period_value=""):
                   c.company_code,
                   c.company_name,
                   COALESCE(p.revenue, 0) AS income,
-                  COALESCE(p.revenue - p.net_profit, 0) AS expense
+                  COALESCE(p.revenue - p.net_profit, 0) + COALESCE(payroll.total_company_cost, 0) AS expense
                 FROM companies c
                 LEFT JOIN profit_monthly p
                   ON p.company_id = c.id AND p.period_month = %s
+                LEFT JOIN (
+                  SELECT
+                    r.company_id,
+                    SUM(r.total_company_cost) AS total_company_cost
+                  FROM payroll_records r
+                  JOIN payroll_import_batches b ON b.id = r.batch_id
+                  JOIN (
+                    SELECT company_id, MAX(id) AS batch_id
+                    FROM payroll_import_batches
+                    WHERE period_month = %s AND status = 'confirmed'
+                    GROUP BY company_id
+                  ) latest ON latest.batch_id = b.id
+                  WHERE r.period_month = %s
+                  GROUP BY r.company_id
+                ) payroll ON payroll.company_id = c.id
                 WHERE c.status = 'active'
                 ORDER BY c.id
                 """,
-                (period,),
+                (period, period, period),
             )
             rows = cur.fetchall()
     companies = []
