@@ -80,7 +80,8 @@
   const state = {
     selectedCompany: "tech",
     selectedAccount: "tech-cmb-basic",
-    capitalAsOfDate: ""
+    capitalAsOfDate: "",
+    period: ""
   };
 
   function buildCompanyCodeToKey() {
@@ -214,22 +215,100 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }
 
+  function normalizePeriod(value) {
+    const match = /^(\d{4})-(\d{2})$/.exec(String(value || "").trim());
+    return match ? `${match[1]}-${match[2]}` : "";
+  }
+
+  function queryPeriod() {
+    try {
+      return normalizePeriod(new URLSearchParams(window.location.search).get("period"));
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function storedPeriod() {
+    try {
+      return normalizePeriod(window.localStorage.getItem("caishenye.period"));
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function globalPeriod() {
+    if (!state.period) state.period = queryPeriod() || storedPeriod() || currentPeriod();
+    return state.period;
+  }
+
+  function persistGlobalPeriod(period) {
+    try {
+      window.localStorage.setItem("caishenye.period", period);
+    } catch (error) {
+      // Ignore private-mode storage errors; URL state still carries the period.
+    }
+  }
+
+  function updatePeriodUrl(period) {
+    if (!window.history?.replaceState) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("period", period);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function updatePeriodLinks(period) {
+    document.querySelectorAll(".nav-item[href]").forEach((link) => {
+      const href = link.getAttribute("href") || "";
+      if (!href || href.startsWith("#") || /^https?:/i.test(href)) return;
+      const url = new URL(href, window.location.href);
+      url.searchParams.set("period", period);
+      link.setAttribute("href", `${url.pathname.split("/").pop()}${url.search}${url.hash}`);
+    });
+  }
+
+  function syncPeriodInputs(period) {
+    const month = normalizePeriod(period) || currentPeriod();
+    ["overviewPeriod", "payrollPeriod", "profitPeriod", "propertyPeriod", "capitalAsOfDate"].forEach((id) => {
+      const input = document.getElementById(id);
+      if (input && input.value !== month) input.value = month;
+    });
+    state.capitalAsOfDate = month;
+    const propertyDate = document.getElementById("propertyExpenseDate");
+    if (propertyDate && !propertyDate.value) propertyDate.value = `${month}-01`;
+  }
+
+  function setGlobalPeriod(period, options = {}) {
+    const nextPeriod = normalizePeriod(period) || currentPeriod();
+    const previousPeriod = state.period;
+    state.period = nextPeriod;
+    persistGlobalPeriod(nextPeriod);
+    updatePeriodUrl(nextPeriod);
+    updatePeriodLinks(nextPeriod);
+    syncPeriodInputs(nextPeriod);
+    if (pendingPayrollImport) pendingPayrollImport.period = nextPeriod;
+    if (pendingCapitalImport) hideCapitalPreview(selectedCapitalAccountStatus());
+    if (options.reload === false || (previousPeriod === nextPeriod && options.force !== true)) return;
+    loadOverview();
+    loadPayrollSummary();
+    loadProfitSummary();
+    loadPropertySummary();
+    loadCompanies();
+  }
+
   function selectedPayrollPeriod() {
-    return document.getElementById("payrollPeriod")?.value || currentPeriod();
+    return document.getElementById("payrollPeriod")?.value || globalPeriod();
   }
 
   function selectedOverviewPeriod() {
-    return document.getElementById("overviewPeriod")?.value || currentPeriod();
+    return document.getElementById("overviewPeriod")?.value || globalPeriod();
   }
 
   function setOverviewPeriod(period) {
-    const input = document.getElementById("overviewPeriod");
-    if (input) input.value = period || currentPeriod();
-    loadOverview();
+    setGlobalPeriod(period);
   }
 
   function handleOverviewPeriodChange() {
-    loadOverview();
+    setGlobalPeriod(selectedOverviewPeriod());
   }
 
   function shiftPeriod(period, offset) {
@@ -241,15 +320,11 @@
   }
 
   function setPayrollPeriod(period) {
-    const input = document.getElementById("payrollPeriod");
-    if (input) input.value = period;
-    handlePayrollPeriodChange();
+    setGlobalPeriod(period);
   }
 
   function handlePayrollPeriodChange() {
-    const period = selectedPayrollPeriod();
-    if (pendingPayrollImport) pendingPayrollImport.period = period;
-    loadPayrollSummary();
+    setGlobalPeriod(selectedPayrollPeriod());
   }
 
   function formatDate(value) {
@@ -317,7 +392,7 @@
   }
 
   function selectedCapitalDate() {
-    return capitalMonthToAsOf(document.getElementById("capitalAsOfDate")?.value || state.capitalAsOfDate || "");
+    return capitalMonthToAsOf(document.getElementById("capitalAsOfDate")?.value || state.capitalAsOfDate || globalPeriod());
   }
 
   function setCapitalDateValue(value) {
@@ -1370,13 +1445,15 @@
   }
 
   async function handleCapitalDateChange() {
-    setCapitalDateValue(selectedCapitalDate());
+    setGlobalPeriod(toCapitalMonth(document.getElementById("capitalAsOfDate")?.value || selectedCapitalDate()), { reload: false });
+    setCapitalDateValue(globalPeriod());
     if (pendingCapitalImport) hideCapitalPreview(selectedCapitalAccountStatus());
     await loadCompanies();
   }
 
   async function showLatestCapitalDate() {
-    setCapitalDateValue("");
+    setGlobalPeriod(currentPeriod(), { reload: false });
+    setCapitalDateValue(globalPeriod());
     if (pendingCapitalImport) hideCapitalPreview(selectedCapitalAccountStatus());
     await loadCompanies();
   }
@@ -1680,7 +1757,7 @@
   }
 
   function selectedProfitPeriod() {
-    return document.getElementById("profitPeriod")?.value || currentPeriod();
+    return document.getElementById("profitPeriod")?.value || globalPeriod();
   }
 
   function profitCompanyRows() {
@@ -1896,13 +1973,11 @@
   }
 
   function setProfitPeriod(period) {
-    const input = document.getElementById("profitPeriod");
-    if (input) input.value = period;
-    loadProfitSummary();
+    setGlobalPeriod(period);
   }
 
   function selectedPropertyPeriod() {
-    return document.getElementById("propertyPeriod")?.value || currentPeriod();
+    return document.getElementById("propertyPeriod")?.value || globalPeriod();
   }
 
   function propertyPeriodStartDate() {
@@ -2841,11 +2916,12 @@
 
     document.getElementById("propertyPeriod")?.addEventListener("change", () => {
       const dateInput = document.getElementById("propertyExpenseDate");
+      setGlobalPeriod(selectedPropertyPeriod(), { reload: false });
       if (dateInput) dateInput.value = propertyPeriodStartDate();
       loadPropertySummary();
     });
 
-    document.getElementById("profitPeriod")?.addEventListener("change", loadProfitSummary);
+    document.getElementById("profitPeriod")?.addEventListener("change", () => setGlobalPeriod(selectedProfitPeriod()));
     document.getElementById("profitPrevMonth")?.addEventListener("click", () => {
       setProfitPeriod(shiftPeriod(selectedProfitPeriod(), -1));
     });
@@ -2922,9 +2998,10 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
-    document.querySelectorAll('input[type="month"][data-default-current]').forEach((node) => {
-      if (!node.value) node.value = currentPeriod();
-    });
+    const period = globalPeriod();
+    syncPeriodInputs(period);
+    updatePeriodUrl(period);
+    updatePeriodLinks(period);
     bindEvents();
     await loadCompanies();
     setPropertyExpenseType(document.getElementById("propertyExpenseType")?.value || "房租");
