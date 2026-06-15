@@ -266,9 +266,32 @@
     });
   }
 
+  function ensureSidebarPeriodControl() {
+    const sidebar = document.querySelector(".sidebar");
+    const nav = sidebar?.querySelector(".nav-list");
+    if (!sidebar || !nav || sidebar.querySelector(".sidebar-period-control")) return;
+    const wrapper = document.createElement("section");
+    wrapper.className = "sidebar-period-control";
+    wrapper.setAttribute("aria-label", "选择业务月份");
+    wrapper.innerHTML = `
+      <div class="sidebar-period-title">
+        <span>业务月份</span>
+      </div>
+      <div class="sidebar-period-actions">
+        <button class="ghost-button period-step-button" type="button" id="globalPrevMonth">上月</button>
+        <label class="period-control sidebar-period-input">
+          <span>选择月份</span>
+          <input id="globalPeriodInput" type="month">
+        </label>
+        <button class="ghost-button period-step-button" type="button" id="globalNextMonth">下月</button>
+      </div>
+    `;
+    sidebar.insertBefore(wrapper, nav);
+  }
+
   function syncPeriodInputs(period) {
     const month = normalizePeriod(period) || currentPeriod();
-    ["overviewPeriod", "payrollPeriod", "profitPeriod", "propertyPeriod", "capitalAsOfDate"].forEach((id) => {
+    ["globalPeriodInput", "overviewPeriod", "payrollPeriod", "profitPeriod", "propertyPeriod", "capitalAsOfDate"].forEach((id) => {
       const input = document.getElementById(id);
       if (input && input.value !== month) input.value = month;
     });
@@ -2851,6 +2874,9 @@
 
     document.getElementById("capitalAsOfDate")?.addEventListener("change", handleCapitalDateChange);
     document.getElementById("capitalLatestDate")?.addEventListener("click", showLatestCapitalDate);
+    document.getElementById("globalPeriodInput")?.addEventListener("change", () => setGlobalPeriod(document.getElementById("globalPeriodInput")?.value));
+    document.getElementById("globalPrevMonth")?.addEventListener("click", () => setGlobalPeriod(shiftPeriod(globalPeriod(), -1)));
+    document.getElementById("globalNextMonth")?.addEventListener("click", () => setGlobalPeriod(shiftPeriod(globalPeriod(), 1)));
     document.getElementById("overviewPeriod")?.addEventListener("change", handleOverviewPeriodChange);
     document.getElementById("overviewPrevMonth")?.addEventListener("click", () => setOverviewPeriod(shiftPeriod(selectedOverviewPeriod(), -1)));
     document.getElementById("overviewNextMonth")?.addEventListener("click", () => setOverviewPeriod(shiftPeriod(selectedOverviewPeriod(), 1)));
@@ -2998,6 +3024,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
+    ensureSidebarPeriodControl();
     const period = globalPeriod();
     syncPeriodInputs(period);
     updatePeriodUrl(period);
