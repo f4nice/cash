@@ -470,6 +470,7 @@ h2 {
   margin-bottom: 18px;
 }
 
+.overview-period-switcher,
 .payroll-period-switcher {
   display: flex;
   align-items: flex-end;
@@ -478,6 +479,7 @@ h2 {
   justify-content: flex-end;
 }
 
+.overview-period-control,
 .payroll-period-control {
   min-width: 168px;
   margin-bottom: 0;
@@ -2061,6 +2063,7 @@ td {
     flex-direction: column;
   }
 
+  .overview-period-switcher,
   .payroll-period-switcher,
   .profit-period-switcher,
   .salary-dialog-actions,
@@ -2068,6 +2071,7 @@ td {
     justify-content: stretch;
   }
 
+  .overview-period-control,
   .payroll-period-control,
   .profit-period-control {
     flex: 1;

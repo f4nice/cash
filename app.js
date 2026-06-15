@@ -218,6 +218,20 @@
     return document.getElementById("payrollPeriod")?.value || currentPeriod();
   }
 
+  function selectedOverviewPeriod() {
+    return document.getElementById("overviewPeriod")?.value || currentPeriod();
+  }
+
+  function setOverviewPeriod(period) {
+    const input = document.getElementById("overviewPeriod");
+    if (input) input.value = period || currentPeriod();
+    loadOverview();
+  }
+
+  function handleOverviewPeriodChange() {
+    loadOverview();
+  }
+
   function shiftPeriod(period, offset) {
     const match = /^(\d{4})-(\d{2})$/.exec(period || currentPeriod());
     const year = match ? Number(match[1]) : new Date().getFullYear();
@@ -2627,12 +2641,15 @@
 
   async function loadOverview() {
     if (!document.getElementById("todayIncomeMetric")) return;
+    const period = selectedOverviewPeriod();
     try {
-      const response = await fetch("/api/overview");
+      const response = await fetch(`/api/overview?period=${encodeURIComponent(period)}`);
       if (!response.ok) return;
       const data = await response.json();
       const companies = data.companies || [];
       if (data.period) {
+        const input = document.getElementById("overviewPeriod");
+        if (input && input.value !== data.period) input.value = data.period;
         const [year, month] = String(data.period).split("-");
         setText("overviewPeriodLabel", `${year}年${Number(month)}月 · 月度经营`);
       }
@@ -2685,6 +2702,9 @@
 
     document.getElementById("capitalAsOfDate")?.addEventListener("change", handleCapitalDateChange);
     document.getElementById("capitalLatestDate")?.addEventListener("click", showLatestCapitalDate);
+    document.getElementById("overviewPeriod")?.addEventListener("change", handleOverviewPeriodChange);
+    document.getElementById("overviewPrevMonth")?.addEventListener("click", () => setOverviewPeriod(shiftPeriod(selectedOverviewPeriod(), -1)));
+    document.getElementById("overviewNextMonth")?.addEventListener("click", () => setOverviewPeriod(shiftPeriod(selectedOverviewPeriod(), 1)));
 
     document.querySelectorAll("[data-scroll-target]").forEach((node) => {
       node.addEventListener("click", () => {

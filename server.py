@@ -383,8 +383,8 @@ def ensure_seed_data():
         conn.commit()
 
 
-def load_overview():
-    period, start_day, end_day = month_bounds(date.today().strftime("%Y-%m"))
+def load_overview(period_value=""):
+    period, start_day, end_day = month_bounds(period_value or date.today().strftime("%Y-%m"))
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -1709,7 +1709,7 @@ class Handler(SimpleHTTPRequestHandler):
         if method == "GET" and path == "/api/health":
             return {"ok": True, "database": os.getenv("MYSQL_DATABASE", "caishenye")}
         if method == "GET" and path == "/api/overview":
-            return load_overview()
+            return load_overview((query.get("period") or [""])[0])
         if method == "GET" and path == "/api/companies":
             return load_companies((query.get("asOf") or [""])[0])
         if method == "GET" and path == "/api/payroll/summary":

@@ -67,11 +67,13 @@
           <p class="eyebrow" id="overviewPeriodLabel">本月经营</p>
           <h1>财务总览</h1>
         </div>
-        <div class="topbar-actions readonly-actions">
-          <a class="ghost-button link-button" href="capital.html">资金表</a>
-          <a class="ghost-button link-button" href="profit.html">利润表</a>
-          <a class="ghost-button link-button" href="payroll.html">工资社保</a>
-          <a class="ghost-button link-button" href="property.html">物业费用</a>
+        <div class="topbar-actions overview-period-switcher" aria-label="选择总览月份">
+          <button class="ghost-button period-step-button" type="button" id="overviewPrevMonth">上月</button>
+          <label class="period-control overview-period-control">
+            <span>所属月份</span>
+            <input id="overviewPeriod" type="month" data-default-current>
+          </label>
+          <button class="ghost-button period-step-button" type="button" id="overviewNextMonth">下月</button>
         </div>
       </header>
 
