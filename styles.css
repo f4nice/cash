@@ -131,6 +131,7 @@ button {
 
 .company-panel {
   margin-top: auto;
+  min-height: 0;
 }
 
 .company-panel-title {
@@ -166,6 +167,26 @@ button {
 .company-list {
   display: grid;
   gap: 8px;
+  height: min(42vh, 360px);
+  max-height: calc(100vh - 260px);
+  min-height: 150px;
+  padding-right: 4px;
+  overflow-y: auto;
+  resize: vertical;
+  scrollbar-gutter: stable;
+}
+
+.company-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.company-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(15, 143, 122, 0.28);
+}
+
+.company-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .company-row {
