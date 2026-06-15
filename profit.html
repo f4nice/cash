@@ -6,6 +6,7 @@
   <title>利润表 - 财神爷</title>
   <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -46,6 +47,29 @@
             </div>
           </div>
 
+          <section class="profit-upload-panel" aria-labelledby="profit-upload-title">
+            <div class="section-title-row compact">
+              <div><p class="eyebrow">图片上传</p><h3 id="profit-upload-title">上传利润图片</h3></div>
+              <label class="primary-button file-action" for="profitImageFile" role="button" tabindex="0">上传图片</label>
+            </div>
+            <div class="profit-upload-body">
+              <label class="profit-image-dropzone" for="profitImageFile">
+                <input id="profitImageFile" type="file" accept="image/*">
+                <span class="upload-icon" aria-hidden="true">IMG</span>
+                <strong>选择利润截图或照片</strong>
+                <small id="profitImageFileName">未选择文件</small>
+              </label>
+              <div class="profit-image-result" id="profitImageResult" hidden>
+                <img id="profitImagePreview" alt="利润图片预览">
+                <div>
+                  <p class="eyebrow">识别结果</p>
+                  <p id="profitImageStatus">图片已上传，等待识别</p>
+                  <pre id="profitImageText">暂未识别到文字</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div class="profit-overview" aria-label="利润总览">
             <article><span>当月净利润</span><strong id="profitTotalNet">¥ 0</strong></article>
             <article><span>盈利公司</span><strong id="profitPositiveCount">0 家</strong></article>
@@ -62,22 +86,6 @@
               <div class="profit-company-grid" id="profitCompanyGrid">
                 <button class="profit-company-card selected" type="button" data-company="tech"><span>示例科技</span><strong>¥ 0</strong><small>收入 ¥ 0 · 成本 ¥ 0</small></button>
               </div>
-            </section>
-
-            <section class="profit-entry-panel" aria-labelledby="profit-entry-title">
-              <div class="section-title-row">
-                <div><p class="eyebrow">月度录入</p><h3 id="profit-entry-title">添加每月利润</h3></div>
-                <span id="profitEntryCompanyBadge">当前公司：示例科技</span>
-              </div>
-              <form class="profit-entry-form" id="profitEntryForm">
-                <label><span>录入公司</span><select id="profitCompanySelect"></select></label>
-                <label><span>收入</span><input id="profitRevenue" type="number" step="0.01" placeholder="可选"></label>
-                <label><span>成本/支出</span><input id="profitCost" type="number" step="0.01" placeholder="可选"></label>
-                <label><span>本月利润</span><input id="profitNet" type="number" step="0.01" placeholder="可直接填利润"></label>
-                <label class="profit-remark-field"><span>备注</span><input id="profitRemark" type="text" placeholder="例如：6月利润录入"></label>
-                <button class="primary-button" type="submit">保存利润</button>
-              </form>
-              <div class="profit-entry-status" id="profitEntryStatus">同一公司同一月份会自动覆盖旧记录</div>
             </section>
           </div>
 

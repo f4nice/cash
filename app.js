@@ -1783,6 +1783,80 @@
     }
   }
 
+  function summarizeProfitOcrText(rawText) {
+    const cleanText = String(rawText || "").trim();
+    const amounts = Array.from(new Set((cleanText.match(/[-+]?¥?\s*\d[\d,]*(?:\.\d+)?/g) || [])
+      .map((item) => item.replace(/\s+/g, ""))
+      .filter((item) => /\d/.test(item))))
+      .slice(0, 12);
+    return [
+      "识别文字：",
+      cleanText || "未识别到文字",
+      "",
+      "可能金额：",
+      amounts.length ? amounts.join("、") : "未识别到明显金额"
+    ].join("\n");
+  }
+
+  async function handleProfitImageUpload(event) {
+    const file = event.target.files?.[0];
+    const fileName = document.getElementById("profitImageFileName");
+    const panel = document.getElementById("profitImageResult");
+    const preview = document.getElementById("profitImagePreview");
+    const status = document.getElementById("profitImageStatus");
+    const text = document.getElementById("profitImageText");
+    if (!file) {
+      if (fileName) fileName.textContent = "未选择文件";
+      if (panel) panel.hidden = true;
+      return;
+    }
+    if (fileName) fileName.textContent = file.name;
+    if (panel) panel.hidden = false;
+    if (status) status.textContent = "图片已读取，正在准备识别";
+    if (text) {
+      text.textContent = [
+        `文件：${file.name}`,
+        `大小：${(file.size / 1024).toFixed(1)} KB`,
+        "状态：正在等待 OCR 组件"
+      ].join("\n");
+    }
+    if (preview) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        preview.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (!window.Tesseract?.recognize) {
+      if (status) status.textContent = "图片已读取；OCR 组件未加载，当前仅显示预览";
+      if (text) {
+        text.textContent = [
+          `文件：${file.name}`,
+          `大小：${(file.size / 1024).toFixed(1)} KB`,
+          "状态：OCR 组件未加载，无法自动识别图片文字"
+        ].join("\n");
+      }
+      return;
+    }
+
+    try {
+      if (status) status.textContent = "正在识别图片文字";
+      const result = await window.Tesseract.recognize(file, "chi_sim+eng", {
+        logger(message) {
+          if (!status || message.status !== "recognizing text") return;
+          const progress = Math.round(Number(message.progress || 0) * 100);
+          status.textContent = `正在识别图片文字 ${progress}%`;
+        }
+      });
+      if (status) status.textContent = "图片文字识别完成，请核对后录入";
+      if (text) text.textContent = summarizeProfitOcrText(result?.data?.text || "");
+    } catch (error) {
+      if (status) status.textContent = "图片识别失败，请换清晰截图或稍后重试";
+      if (text) text.textContent = error?.message || "OCR 识别失败";
+    }
+  }
+
   async function saveProfitMonthly(event) {
     event.preventDefault();
     const company = companyData[state.selectedCompany];
@@ -2778,6 +2852,7 @@
     document.getElementById("profitNextMonth")?.addEventListener("click", () => {
       setProfitPeriod(shiftPeriod(selectedProfitPeriod(), 1));
     });
+    document.getElementById("profitImageFile")?.addEventListener("change", handleProfitImageUpload);
     document.getElementById("profitEntryForm")?.addEventListener("submit", saveProfitMonthly);
 
     document.getElementById("payrollPeriod")?.addEventListener("change", handlePayrollPeriodChange);
