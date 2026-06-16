@@ -599,7 +599,7 @@
 
     return rows.slice(startIndex).map((row, offset) => {
       const sourceIndex = startIndex + offset;
-      if (selectedCapitalSourceRowIndexes.size && !selectedCapitalSourceRowIndexes.has(sourceIndex)) return null;
+      if (!selectedCapitalSourceRowIndexes.has(sourceIndex)) return null;
       const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
       const getMoney = (key) => (columns[key] >= 0 ? parseAmount(row[columns[key]]) : 0);
       let income = getMoney("income");
@@ -872,7 +872,7 @@
     let activeYear = "";
     pendingCapitalImport.rows.slice(pendingCapitalImport.startIndex).forEach((row, offset) => {
       const sourceIndex = pendingCapitalImport.startIndex + offset;
-      if (selectedCapitalSourceRowIndexes.size && !selectedCapitalSourceRowIndexes.has(sourceIndex)) return;
+      if (!selectedCapitalSourceRowIndexes.has(sourceIndex)) return;
       activeYear = capitalYearValue(row[0]) || activeYear;
       const dateValue = capitalDateText(row[dateColumn], activeYear);
       if (!dateValue) return;
