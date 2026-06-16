@@ -104,6 +104,7 @@
   let capitalPreviewRows = [];
   let selectedPayrollRowIndexes = new Set();
   let selectedCapitalRowIndexes = new Set();
+  let selectedCapitalSourceRowIndexes = new Set();
   let selectedSalaryBatchIds = new Set();
   let latestPayrollSummary = null;
   let latestProfitSummary = null;
@@ -596,7 +597,9 @@
     const account = getSelectedAccount();
     const { columns, startIndex } = columnMap || mapColumns(rows, capitalFieldAliases, /日期|交易|金额|余额|date|amount/i);
 
-    return rows.slice(startIndex).map((row) => {
+    return rows.slice(startIndex).map((row, offset) => {
+      const sourceIndex = startIndex + offset;
+      if (selectedCapitalSourceRowIndexes.size && !selectedCapitalSourceRowIndexes.has(sourceIndex)) return null;
       const getText = (key) => (columns[key] >= 0 ? String(row[columns[key]] || "").trim() : "");
       const getMoney = (key) => (columns[key] >= 0 ? parseAmount(row[columns[key]]) : 0);
       let income = getMoney("income");
@@ -623,7 +626,7 @@
         expense,
         balance: getMoney("balance")
       };
-    }).filter((row) => row.date !== "未填日期" || row.income || row.expense || row.balance);
+    }).filter((row) => row && (row.date !== "未填日期" || row.income || row.expense || row.balance));
   }
 
   function capitalColumnCount(rows) {
@@ -781,7 +784,7 @@
     const summary = document.getElementById("capitalDialogSummary");
     if (!summary || !pendingCapitalImport) return;
     const rowCount = pendingCapitalImport.rows.length;
-    const dataRows = Math.max(rowCount - pendingCapitalImport.startIndex, 0);
+    const dataRows = selectedCapitalSourceRowIndexes.size || Math.max(rowCount - pendingCapitalImport.startIndex, 0);
     const selectedColumns = (pendingCapitalImport.matrixColumns || []).filter((column) => column.selected).length;
     const scopeLabel = pendingCapitalImport.mode === "matrix" ? "归档方式" : "当前公司";
     const scopeValue = pendingCapitalImport.mode === "matrix" ? "按列归到公司" : pendingCapitalImport.company.name;
@@ -804,21 +807,25 @@
       return;
     }
 
-    head.innerHTML = `<tr><th class="row-index-cell">行</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`;
+    head.innerHTML = `<tr><th class="row-index-cell">行</th><th class="select-cell"><input id="selectAllCapitalSourceRows" type="checkbox" aria-label="全选Excel行"></th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`;
     const previewStart = pendingCapitalImport.startIndex < pendingCapitalImport.rows.length
       ? pendingCapitalImport.startIndex
       : 0;
-    const previewRows = pendingCapitalImport.rows.slice(previewStart, previewStart + 20);
+    const previewRows = pendingCapitalImport.rows.slice(previewStart);
     if (!previewRows.length) {
-      body.innerHTML = `<tr><td colspan="${labels.length + 1}">没有读取到可预览数据</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${labels.length + 2}">没有读取到可预览数据</td></tr>`;
       return;
     }
     body.innerHTML = previewRows.map((row, offset) => `
       <tr>
         <td class="row-index-cell">${previewStart + offset + 1}</td>
+        <td class="select-cell">
+          <input class="capital-source-row-check" type="checkbox" data-source-row="${previewStart + offset}" aria-label="选择Excel第${previewStart + offset + 1}行" ${selectedCapitalSourceRowIndexes.has(previewStart + offset) ? "checked" : ""}>
+        </td>
         ${labels.map((_, index) => `<td>${escapeHtml(row[index] ?? "")}</td>`).join("")}
       </tr>
     `).join("");
+    updateCapitalSourceSelectionSummary();
   }
 
   function setCapitalMatrixVisible(visible) {
@@ -863,7 +870,9 @@
     const dateColumn = pendingCapitalImport.dateColumn >= 0 ? pendingCapitalImport.dateColumn : 1;
     const rows = [];
     let activeYear = "";
-    pendingCapitalImport.rows.slice(pendingCapitalImport.startIndex).forEach((row) => {
+    pendingCapitalImport.rows.slice(pendingCapitalImport.startIndex).forEach((row, offset) => {
+      const sourceIndex = pendingCapitalImport.startIndex + offset;
+      if (selectedCapitalSourceRowIndexes.size && !selectedCapitalSourceRowIndexes.has(sourceIndex)) return;
       activeYear = capitalYearValue(row[0]) || activeYear;
       const dateValue = capitalDateText(row[dateColumn], activeYear);
       if (!dateValue) return;
@@ -1096,6 +1105,32 @@
     }
   }
 
+  function capitalSourceRowIndexes() {
+    if (!pendingCapitalImport) return [];
+    const start = pendingCapitalImport.startIndex < pendingCapitalImport.rows.length
+      ? pendingCapitalImport.startIndex
+      : 0;
+    return pendingCapitalImport.rows.slice(start).map((_, offset) => start + offset);
+  }
+
+  function selectAllCapitalSourceRows() {
+    selectedCapitalSourceRowIndexes = new Set(capitalSourceRowIndexes());
+  }
+
+  function updateCapitalSourceSelectionSummary() {
+    const indexes = capitalSourceRowIndexes();
+    const selectedCount = indexes.filter((index) => selectedCapitalSourceRowIndexes.has(index)).length;
+    const selectAll = document.getElementById("selectAllCapitalSourceRows");
+
+    if (selectAll) {
+      selectAll.disabled = indexes.length === 0;
+      selectAll.checked = indexes.length > 0 && selectedCount === indexes.length;
+      selectAll.indeterminate = selectedCount > 0 && selectedCount < indexes.length;
+    }
+
+    renderCapitalDialogSummary();
+  }
+
   function getSelectedAccount() {
     const company = companyData[state.selectedCompany];
     return company?.bankAccounts.find((account) => account.id === state.selectedAccount) || company?.bankAccounts[0] || null;
@@ -1168,6 +1203,7 @@
     pendingCapitalImport = null;
     capitalPreviewRows = [];
     selectedCapitalRowIndexes = new Set();
+    selectedCapitalSourceRowIndexes = new Set();
     setCapitalMappingVisible(false);
     setCapitalMatrixVisible(false);
     setCapitalPreviewButtonVisible(false);
@@ -1819,6 +1855,7 @@
       pendingCapitalImport = null;
       capitalPreviewRows = [];
       selectedCapitalRowIndexes = new Set();
+      selectedCapitalSourceRowIndexes = new Set();
       setCapitalMappingVisible(false);
       setCapitalMatrixVisible(false);
       setCapitalPreviewButtonVisible(false);
@@ -2395,6 +2432,7 @@
     pendingCapitalImport = null;
     capitalPreviewRows = [];
     selectedCapitalRowIndexes = new Set();
+    selectedCapitalSourceRowIndexes = new Set();
     setCapitalSaveButton(false, "读取中");
 
     const rows = await readSheetRows(file, "capitalImportStatus", sheetName);
@@ -2419,6 +2457,7 @@
       matrixColumns,
       mappedRows: []
     };
+    selectAllCapitalSourceRows();
     renderCapitalDialogSummary();
     if (isMatrix) {
       setCapitalMappingVisible(false);
@@ -2452,6 +2491,7 @@
     try {
       const result = await postJson("/api/import/capital", payload);
       pendingCapitalImport = null;
+      selectedCapitalSourceRowIndexes = new Set();
       setCapitalSaveButton(false, "已保存");
       setCapitalPreviewButtonVisible(false);
       closeCapitalPreviewDialog();
@@ -3096,6 +3136,31 @@
         selectedCapitalRowIndexes.delete(index);
       }
       updateCapitalSelectionSummary();
+    });
+
+    document.getElementById("capitalRawPreviewHead")?.addEventListener("change", (event) => {
+      if (event.target.id !== "selectAllCapitalSourceRows") return;
+      selectedCapitalSourceRowIndexes = event.target.checked
+        ? new Set(capitalSourceRowIndexes())
+        : new Set();
+      document.querySelectorAll(".capital-source-row-check").forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+      updateCapitalSourceSelectionSummary();
+      updateCapitalPreviewFromMapping();
+    });
+
+    document.getElementById("capitalRawPreviewBody")?.addEventListener("change", (event) => {
+      if (!event.target.classList.contains("capital-source-row-check")) return;
+      const index = Number(event.target.dataset.sourceRow);
+      if (!Number.isInteger(index)) return;
+      if (event.target.checked) {
+        selectedCapitalSourceRowIndexes.add(index);
+      } else {
+        selectedCapitalSourceRowIndexes.delete(index);
+      }
+      updateCapitalSourceSelectionSummary();
+      updateCapitalPreviewFromMapping();
     });
 
     document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);
