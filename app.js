@@ -1193,6 +1193,30 @@
     }
   }
 
+  function companyPanelCollapsed() {
+    try {
+      return window.localStorage.getItem("caishenye.companyPanelCollapsed") === "1";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function setCompanyPanelCollapsed(collapsed) {
+    try {
+      window.localStorage.setItem("caishenye.companyPanelCollapsed", collapsed ? "1" : "0");
+    } catch (error) {
+      // Ignore storage errors; the current page still reflects the selected state.
+    }
+    document.querySelectorAll(".company-panel").forEach((panel) => {
+      panel.classList.toggle("is-collapsed", collapsed);
+      const button = panel.querySelector(".company-collapse-button");
+      if (button) {
+        button.textContent = collapsed ? "展开" : "收起";
+        button.setAttribute("aria-expanded", String(!collapsed));
+      }
+    });
+  }
+
   function ensureCompanyPanelControls() {
     document.querySelectorAll(".company-panel").forEach((panel) => {
       const title = panel.querySelector("h2");
@@ -1201,6 +1225,11 @@
         titleRow.className = "company-panel-title";
         title.replaceWith(titleRow);
         titleRow.appendChild(title);
+        const collapseButton = document.createElement("button");
+        collapseButton.className = "company-collapse-button";
+        collapseButton.type = "button";
+        collapseButton.addEventListener("click", () => setCompanyPanelCollapsed(!panel.classList.contains("is-collapsed")));
+        titleRow.appendChild(collapseButton);
         const manageButton = document.createElement("button");
         manageButton.className = "company-manage-button";
         manageButton.type = "button";
@@ -1217,6 +1246,7 @@
         });
         panel.appendChild(list);
       }
+      setCompanyPanelCollapsed(companyPanelCollapsed());
     });
   }
 

@@ -200,6 +200,7 @@ button {
   margin: 0;
 }
 
+.company-collapse-button,
 .company-manage-button {
   min-height: 28px;
   padding: 0 9px;
@@ -211,6 +212,10 @@ button {
   font-weight: 800;
 }
 
+.company-collapse-button {
+  margin-left: auto;
+}
+
 .company-list {
   display: grid;
   gap: 8px;
@@ -219,8 +224,11 @@ button {
   min-height: 150px;
   padding-right: 4px;
   overflow-y: auto;
-  resize: vertical;
   scrollbar-gutter: stable;
+}
+
+.company-panel.is-collapsed .company-list {
+  display: none;
 }
 
 .company-list::-webkit-scrollbar {
