@@ -318,7 +318,7 @@ h2 {
 .payroll-period-switcher,
 .capital-date-control,
 .property-manual > .period-control {
-  display: none;
+  display: none !important;
 }
 
 .capital-top-actions {
