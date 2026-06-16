@@ -314,6 +314,13 @@ h2 {
   display: none;
 }
 
+.profit-period-switcher,
+.payroll-period-switcher,
+.capital-date-control,
+.property-manual > .period-control {
+  display: none;
+}
+
 .capital-top-actions {
   align-items: center;
   flex-wrap: wrap;
