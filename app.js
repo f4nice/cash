@@ -103,6 +103,7 @@
   let payrollPreviewRows = [];
   let capitalPreviewRows = [];
   let selectedPayrollRowIndexes = new Set();
+  let selectedCapitalRowIndexes = new Set();
   let selectedSalaryBatchIds = new Set();
   let latestPayrollSummary = null;
   let latestProfitSummary = null;
@@ -925,6 +926,7 @@
     if (!pendingCapitalImport) return;
     if (pendingCapitalImport.mode === "matrix") {
       capitalPreviewRows = mapCapitalMatrixRows();
+      selectedCapitalRowIndexes = new Set(capitalPreviewRows.map((_, index) => index));
       pendingCapitalImport.mappedRows = capitalPreviewRows;
       const dates = Array.from(new Set(capitalPreviewRows.map((row) => row.date))).sort();
       const latestDate = dates[dates.length - 1];
@@ -938,7 +940,7 @@
       });
       renderCapitalPreview(capitalPreviewRows);
       renderCashFlowSummary(capitalPreviewRows);
-      setCapitalSaveButton(capitalPreviewRows.length > 0);
+      updateCapitalSelectionSummary();
       return;
     }
 
@@ -946,6 +948,7 @@
       columns: selectedCapitalColumns(),
       startIndex: pendingCapitalImport.startIndex
     });
+    selectedCapitalRowIndexes = new Set(capitalPreviewRows.map((_, index) => index));
     pendingCapitalImport.mappedRows = capitalPreviewRows;
 
     const total = summarizeCapital(capitalPreviewRows);
@@ -957,7 +960,7 @@
     });
     renderCapitalPreview(capitalPreviewRows);
     renderCashFlowSummary(capitalPreviewRows);
-    setCapitalSaveButton(capitalPreviewRows.length > 0);
+    updateCapitalSelectionSummary();
   }
 
   function mapPropertyRows(rows) {
@@ -1026,6 +1029,10 @@
     return payrollPreviewRows.filter((_, index) => selectedPayrollRowIndexes.has(index));
   }
 
+  function selectedCapitalRows() {
+    return capitalPreviewRows.filter((_, index) => selectedCapitalRowIndexes.has(index));
+  }
+
   function updatePayrollSelectionSummary() {
     const rows = selectedPayrollRows();
     const total = summarizePayroll(rows);
@@ -1047,6 +1054,45 @@
     if (pendingPayrollImport) {
       pendingPayrollImport.rows = rows;
       setPayrollSaveButton(rows.length > 0, rows.length ? "保存" : "无数据");
+    }
+  }
+
+  function updateCapitalSelectionSummary() {
+    const rows = selectedCapitalRows();
+    const selectAll = document.getElementById("selectAllCapitalRows");
+
+    if (selectAll) {
+      selectAll.disabled = capitalPreviewRows.length === 0;
+      selectAll.checked = capitalPreviewRows.length > 0 && rows.length === capitalPreviewRows.length;
+      selectAll.indeterminate = rows.length > 0 && rows.length < capitalPreviewRows.length;
+    }
+
+    if (pendingCapitalImport) {
+      pendingCapitalImport.mappedRows = rows;
+      if (pendingCapitalImport.mode === "matrix") {
+        const dates = Array.from(new Set(rows.map((row) => row.date))).sort();
+        const latestDate = dates[dates.length - 1];
+        const latestBalance = rows
+          .filter((row) => row.date === latestDate)
+          .reduce((sum, row) => sum + row.balance, 0);
+        setCapitalImportSummary(rows, {
+          label: "已选择资金列",
+          countUnit: "条",
+          balance: latestBalance
+        });
+      } else {
+        const total = summarizeCapital(rows);
+        setCapitalImportSummary(rows, {
+          label: "已选择流水",
+          countUnit: "笔",
+          income: total.income,
+          expense: total.expense
+        });
+      }
+      renderCashFlowSummary(rows);
+      setCapitalSaveButton(rows.length > 0, rows.length ? "保存导入" : "无数据");
+    } else {
+      setCapitalSaveButton(false, "保存导入");
     }
   }
 
@@ -1121,6 +1167,7 @@
   function hideCapitalPreview(label = "等待上传") {
     pendingCapitalImport = null;
     capitalPreviewRows = [];
+    selectedCapitalRowIndexes = new Set();
     setCapitalMappingVisible(false);
     setCapitalMatrixVisible(false);
     setCapitalPreviewButtonVisible(false);
@@ -1771,6 +1818,7 @@
       });
       pendingCapitalImport = null;
       capitalPreviewRows = [];
+      selectedCapitalRowIndexes = new Set();
       setCapitalMappingVisible(false);
       setCapitalMatrixVisible(false);
       setCapitalPreviewButtonVisible(false);
@@ -2237,12 +2285,16 @@
     const tbody = document.getElementById("capitalPreviewBody");
     if (!tbody) return;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8">暂无导入数据</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9">暂无导入数据</td></tr>';
+      updateCapitalSelectionSummary();
       return;
     }
 
-    tbody.innerHTML = rows.slice(0, 12).map((row) => `
+    tbody.innerHTML = rows.map((row, index) => `
       <tr>
+        <td class="select-cell">
+          <input class="capital-row-check" type="checkbox" data-capital-row="${index}" aria-label="选择第${index + 1}行" ${selectedCapitalRowIndexes.has(index) ? "checked" : ""}>
+        </td>
         <td>${escapeHtml(row.date)}</td>
         <td>${escapeHtml(row.bank)}</td>
         <td>${escapeHtml(row.account)}</td>
@@ -2253,6 +2305,7 @@
         <td>${row.balance ? formatMoney(row.balance) : "-"}</td>
       </tr>
     `).join("");
+    updateCapitalSelectionSummary();
   }
 
   function renderCashFlowSummary(rows) {
@@ -2341,6 +2394,7 @@
     setText("capitalImportStatus", sheetName ? `读取Sheet：${sheetName}` : "读取中");
     pendingCapitalImport = null;
     capitalPreviewRows = [];
+    selectedCapitalRowIndexes = new Set();
     setCapitalSaveButton(false, "读取中");
 
     const rows = await readSheetRows(file, "capitalImportStatus", sheetName);
@@ -2384,14 +2438,15 @@
   }
 
   async function saveCapitalImport() {
-    if (!pendingCapitalImport || !capitalPreviewRows.length) return;
+    const rows = selectedCapitalRows();
+    if (!pendingCapitalImport || !rows.length) return;
     const mode = pendingCapitalImport.mode;
     const payload = {
       company: pendingCapitalImport.company,
       account: pendingCapitalImport.account,
       fileName: pendingCapitalImport.fileName,
       sheetName: pendingCapitalImport.sheetName,
-      rows: capitalPreviewRows
+      rows
     };
     setCapitalSaveButton(false, "保存中");
     try {
@@ -3019,6 +3074,28 @@
         selectedPayrollRowIndexes.delete(index);
       }
       updatePayrollSelectionSummary();
+    });
+
+    document.getElementById("selectAllCapitalRows")?.addEventListener("change", (event) => {
+      selectedCapitalRowIndexes = event.target.checked
+        ? new Set(capitalPreviewRows.map((_, index) => index))
+        : new Set();
+      document.querySelectorAll(".capital-row-check").forEach((checkbox) => {
+        checkbox.checked = event.target.checked;
+      });
+      updateCapitalSelectionSummary();
+    });
+
+    document.getElementById("capitalPreviewBody")?.addEventListener("change", (event) => {
+      if (!event.target.classList.contains("capital-row-check")) return;
+      const index = Number(event.target.dataset.capitalRow);
+      if (!Number.isInteger(index)) return;
+      if (event.target.checked) {
+        selectedCapitalRowIndexes.add(index);
+      } else {
+        selectedCapitalRowIndexes.delete(index);
+      }
+      updateCapitalSelectionSummary();
     });
 
     document.getElementById("savePayrollImport")?.addEventListener("click", savePayrollImport);

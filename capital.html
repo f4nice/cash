@@ -7,7 +7,7 @@
   <link rel="icon" href="assets/logo-caishenye.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=global-period-only-2">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="app.js?v=company-collapse" defer></script>
+  <script src="app.js?v=capital-row-select" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -101,8 +101,8 @@
             </div>
             <div class="table-wrap cashflow-table-wrap">
               <table>
-                <thead><tr><th>日期</th><th>银行</th><th>账户</th><th>摘要</th><th>对方户名</th><th>流入</th><th>流出</th><th>余额</th></tr></thead>
-                <tbody id="capitalPreviewBody"><tr><td colspan="8">暂无导入数据</td></tr></tbody>
+                <thead><tr><th class="select-cell"><input id="selectAllCapitalRows" type="checkbox" aria-label="全选资金记录" disabled></th><th>日期</th><th>银行</th><th>账户</th><th>摘要</th><th>对方户名</th><th>流入</th><th>流出</th><th>余额</th></tr></thead>
+                <tbody id="capitalPreviewBody"><tr><td colspan="9">暂无导入数据</td></tr></tbody>
               </table>
             </div>
           </div>
